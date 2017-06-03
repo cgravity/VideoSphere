@@ -2,17 +2,23 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
+#include <libavutil/time.h>
 }
+
+#include <pthread.h>
 
 #include <iostream>
 #include <cstdio>
 #include <cstdlib>
+#include <list>
 using namespace std;
+
+#include "decoder.h"
 
 #include <GLFW/glfw3.h>
 
 // USE FFMPEG 3.3.1
-
+// USE PortAudio pa_stable_v190600_20161030
 
 // see http://dranger.com/ffmpeg/tutorial01.html for reference
 
@@ -51,9 +57,28 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
+#if 0
+    PaError paerror = Pa_Initialize();
+    if(paerror != paNoError)
+    {
+        cerr << "Failed to init PortAudio\n";
+        return EXIT_FAILURE;
+    }
+#endif
+
     av_register_all();
     avcodec_register_all();
     
+    Decoder decoder;
+    bool ok = decoder.open(argv[1]);
+    
+    if(!ok)
+        return EXIT_FAILURE;
+    
+    // 10 seconds of buffer is ~750MB if video size is 1920x1080
+    decoder.add_fillable_frames(24*5);
+    
+    decoder.start_thread();
     
     GLFWwindow* window;
     
@@ -76,6 +101,7 @@ int main(int argc, char* argv[])
     
     glfwSetWindowSizeCallback(window, on_window_resize);
     
+    #if 0
     AVFormatContext* format_context = NULL;
     
     if(avformat_open_input(&format_context, argv[1], NULL, NULL) != 0)
@@ -105,6 +131,8 @@ int main(int argc, char* argv[])
             break;
         }
     }
+    
+    
     
     if(video_stream == -1)
     {
@@ -168,7 +196,7 @@ int main(int argc, char* argv[])
         
         // only use one of two following lines
         //AV_PIX_FMT_YUV420P,
-        codec_context->pix_fmt, // -- WTF, why does this break?!
+        codec_context->pix_fmt,
         
         codec_context->width,
         codec_context->height,
@@ -178,6 +206,8 @@ int main(int argc, char* argv[])
         NULL,
         NULL,
         NULL);
+    
+    #endif
     
     glEnable(GL_TEXTURE_2D);
     GLuint tex;
@@ -190,18 +220,47 @@ int main(int argc, char* argv[])
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     
     int i = 0;
-    while(av_read_frame(format_context, &packet) >= 0)
+    
+    int64_t start = av_gettime_relative();
+    int64_t now;
+    
+    
+    bool decoded_all = false;
+    
+    //while(av_read_frame(format_context, &packet) >= 0)
+    while(true)
     {
         if(glfwGetKey(window, GLFW_KEY_ESCAPE))
             break;
         
-        if(packet.stream_index == video_stream)
+        decoder.lock();
+        decoded_all = decoder.decoded_all_flag;
+        decoder.unlock();
+        
+        //if(packet.stream_index == video_stream)
         {
-            avcodec_decode_video2(codec_context, frame, &frame_finished, 
-                &packet);
+            //avcodec_decode_video2(codec_context, frame, &frame_finished, 
+            //    &packet);
             
-            if(frame_finished)
+            AVFrame* show_frame = decoder.get_frame();
+            
+            if(!show_frame && decoded_all)
+                break; // reached end of video
+            
+            //if(frame_finished)
+            if(show_frame)
             {
+                AVRational time_base = decoder.time_base;
+                
+                now = av_gettime_relative() - start;
+                
+                double pts = show_frame->pts;
+                pts /= time_base.den;
+                pts *= time_base.num;
+                
+                printf("PTS: %f, NOW: %f\n", pts, now / 1000000.0);
+                
+                #if 0
                 sws_scale(
                     sws_context, 
                     (uint8_t const* const*)frame->data,
@@ -210,10 +269,11 @@ int main(int argc, char* argv[])
                     codec_context->height,
                     frame_rgb->data,
                     frame_rgb->linesize);
+                #endif
                 
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                    codec_context->width, codec_context->height,
-                    0, GL_RGB, GL_UNSIGNED_BYTE, frame_rgb->data[0]);
+                    decoder.codec_context->width, decoder.codec_context->height,
+                    0, GL_RGB, GL_UNSIGNED_BYTE, show_frame->data[0]);
                 
 //                if(++i <= 5)
 //                    SaveFrame(frame_rgb, codec_context->width,
@@ -235,23 +295,28 @@ int main(int argc, char* argv[])
                 }
                 glEnd();
                 
+                decoder.return_frame(show_frame);
+                
                 glfwSwapBuffers(window);
-                glfwPollEvents();
             }
+            
+            glfwPollEvents();
         }
         
         // free packet allocated by av_read_frame
-        av_free_packet(&packet);
+        //av_free_packet(&packet);
     }
     
-    av_free(buffer);
-    av_free(frame_rgb);
-    av_free(frame);
+    //av_free(buffer);
+    //av_free(frame_rgb);
+    //av_free(frame);
     
-    avcodec_close(codec_context);
+    //avcodec_close(codec_context);
     
-    avformat_close_input(&format_context);
+    //avformat_close_input(&format_context);
     
+    decoder.set_quit();
+    decoder.join();
     glfwTerminate();
 }
 

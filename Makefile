@@ -4,7 +4,7 @@ SOURCES := $(wildcard src/*.cpp)
 HEADERS := $(wildcard include/*.h)
 OBJECTS := $(SOURCES:src/%.cpp=build/%.o)
 
-CXXFLAGS := -g -std=c++11
+CXXFLAGS := -g
 
 INCLUDE_FFMPEG := $(shell pkg-config --cflags \
     libavformat libavcodec libswscale)
@@ -20,12 +20,12 @@ LINK_GLFW3 := $(shell pkg-config --libs --static \
 
 video_sphere : $(OBJECTS) Makefile
 	@echo "Linking: $@"
-	g++ -o $@ $(OBJECTS) $(LINK_FFMPEG) $(LINK_GLFW3)
+	@g++ -o $@ $(OBJECTS) $(LINK_FFMPEG) $(LINK_GLFW3)
 
 build/%.o : src/%.cpp $(HEADERS) Makefile
 	@echo "Compiling C++: $<"
 	@mkdir -p ./build
-	@g++ -o $@ $(CXXFLAGS) -c $< $(INCLUDE_FFMPEG) $(INCLUDE_GLFW3) -w
+	@g++ -Iinclude -o $@ $(CXXFLAGS) -c $< $(INCLUDE_FFMPEG) $(INCLUDE_GLFW3) -w
 
 clean:
 	@rm -rf build
