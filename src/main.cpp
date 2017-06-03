@@ -77,7 +77,6 @@ int main(int argc, char* argv[])
     
     // 10 seconds of buffer is ~750MB if video size is 1920x1080
     decoder.add_fillable_frames(24*5);
-    
     decoder.start_thread();
     
     GLFWwindow* window;
@@ -98,116 +97,7 @@ int main(int argc, char* argv[])
     }
     
     glfwMakeContextCurrent(window);
-    
     glfwSetWindowSizeCallback(window, on_window_resize);
-    
-    #if 0
-    AVFormatContext* format_context = NULL;
-    
-    if(avformat_open_input(&format_context, argv[1], NULL, NULL) != 0)
-    {
-        cerr << "Failed to open file\n";
-        return EXIT_FAILURE;
-    }
-    
-    if(avformat_find_stream_info(format_context, NULL) < 0)
-    {
-        cerr << "Failed to determine stream info\n";
-        return EXIT_FAILURE;
-    }
-    
-    // debug
-    av_dump_format(format_context, 0, argv[1], 0);
-    
-    AVCodecContext* codec_context = NULL;
-    
-    int video_stream = -1;
-    
-    for(int i = 0;i < format_context->nb_streams; i++)
-    {
-        if(format_context->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO)
-        {
-            video_stream = i;
-            break;
-        }
-    }
-    
-    
-    
-    if(video_stream == -1)
-    {
-        cerr << "Failed to find video stream\n";
-        return EXIT_FAILURE;
-    }
-    
-    AVCodec* codec = NULL;
-    codec = avcodec_find_decoder(
-        format_context->streams[video_stream]->codecpar->codec_id);
-    
-    if(codec == NULL)
-    {
-        cerr << "Unsupported codec\n";
-        return EXIT_FAILURE;
-    }
-    
-    cout << "CODEC IS: " << codec->name << '\n';
-    
-    codec_context = avcodec_alloc_context3(codec);
-    
-    if(!codec_context)
-    {
-        cerr << "Failed to allocate codec context!\n";
-        return EXIT_FAILURE;
-    }
-    
-    avcodec_parameters_to_context(codec_context,
-        format_context->streams[video_stream]->codecpar);
-    
-    if(avcodec_open2(codec_context, codec, NULL) < 0)
-    {
-        cerr << "Couldn't open codec\n";
-        return EXIT_FAILURE;
-    }
-    
-    AVFrame* frame = NULL;
-    AVFrame* frame_rgb = NULL;
-    
-    frame = av_frame_alloc();
-    frame_rgb = av_frame_alloc();
-    
-    uint8_t* buffer = NULL;
-    int num_bytes;
-    
-    num_bytes = avpicture_get_size(AV_PIX_FMT_RGB24, 
-        codec_context->width, codec_context->height);
-    
-    buffer = (uint8_t*)av_malloc(num_bytes*sizeof(uint8_t));
-    
-    avpicture_fill((AVPicture*)frame_rgb, buffer, AV_PIX_FMT_RGB24,
-        codec_context->width, codec_context->height);
-    
-    struct SwsContext* sws_context = NULL;
-    int frame_finished;
-    AVPacket packet;
-    
-    sws_context = sws_getContext(
-        codec_context->width,
-        codec_context->height,
-        
-        // only use one of two following lines
-        //AV_PIX_FMT_YUV420P,
-        codec_context->pix_fmt,
-        
-        codec_context->width,
-        codec_context->height,
-        AV_PIX_FMT_RGB24,
-        
-        SWS_BILINEAR,
-        NULL,
-        NULL,
-        NULL);
-    
-    #endif
     
     glEnable(GL_TEXTURE_2D);
     GLuint tex;
@@ -227,9 +117,12 @@ int main(int argc, char* argv[])
     
     bool decoded_all = false;
     
-    //while(av_read_frame(format_context, &packet) >= 0)
+    double current_frame_end = -1;
+    
     while(true)
     {
+        glfwPollEvents();
+        
         if(glfwGetKey(window, GLFW_KEY_ESCAPE))
             break;
         
@@ -237,84 +130,80 @@ int main(int argc, char* argv[])
         decoded_all = decoder.decoded_all_flag;
         decoder.unlock();
         
-        //if(packet.stream_index == video_stream)
+        now = av_gettime_relative() - start;
+        
+        double now_f = now / 1000000.0;
+        
+        AVFrame* show_frame = NULL;
+        AVFrame* show_frame_prev = NULL;
+        
+        while(now_f > current_frame_end)
         {
-            //avcodec_decode_video2(codec_context, frame, &frame_finished, 
-            //    &packet);
+            show_frame_prev = show_frame;
+            show_frame = decoder.get_frame();
             
-            AVFrame* show_frame = decoder.get_frame();
-            
-            if(!show_frame && decoded_all)
-                break; // reached end of video
-            
-            //if(frame_finished)
-            if(show_frame)
+            if(show_frame && show_frame_prev)
             {
-                AVRational time_base = decoder.time_base;
-                
-                now = av_gettime_relative() - start;
-                
-                double pts = show_frame->pts;
-                pts /= time_base.den;
-                pts *= time_base.num;
-                
-                printf("PTS: %f, NOW: %f\n", pts, now / 1000000.0);
-                
-                #if 0
-                sws_scale(
-                    sws_context, 
-                    (uint8_t const* const*)frame->data,
-                    frame->linesize,
-                    0,
-                    codec_context->height,
-                    frame_rgb->data,
-                    frame_rgb->linesize);
-                #endif
-                
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                    decoder.codec_context->width, decoder.codec_context->height,
-                    0, GL_RGB, GL_UNSIGNED_BYTE, show_frame->data[0]);
-                
-//                if(++i <= 5)
-//                    SaveFrame(frame_rgb, codec_context->width,
-//                        codec_context->height, i);
-                
-                glBegin(GL_QUADS);
-                {
-                    glTexCoord2f(0,1);
-                    glVertex2f(-1,-1);
-                    
-                    glTexCoord2f(0,0);
-                    glVertex2f(-1,1);
-                    
-                    glTexCoord2f(1,0);
-                    glVertex2f(1,1);
-                    
-                    glTexCoord2f(1,1);
-                    glVertex2f(1,-1);
-                }
-                glEnd();
-                
-                decoder.return_frame(show_frame);
-                
-                glfwSwapBuffers(window);
+                decoder.return_frame(show_frame_prev);
+                show_frame_prev = NULL;
             }
             
-            glfwPollEvents();
+            if(!show_frame && decoded_all)
+                goto end_of_video; // end of video
+            
+            if(!show_frame)
+            {
+                cerr << "Playing faster than decode\n";
+                break;
+            }
+            
+            current_frame_end = show_frame->pts;
+            current_frame_end /= decoder.time_base.den;
+            current_frame_end *= decoder.time_base.num;
         }
         
-        // free packet allocated by av_read_frame
-        //av_free_packet(&packet);
+        if(!show_frame && !show_frame_prev)
+        {
+            // no new frames ready
+            continue;
+        }
+        
+        if(!show_frame && show_frame_prev)
+        {
+            // lagged frame is ready, but current data not available
+            // show it anyway as current frame (better late than nothing)
+            show_frame = show_frame_prev;
+            show_frame_prev = NULL;
+        }
+        
+        //printf("Frame end: %f, NOW: %f\n", current_frame_end, now_f);
+        
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+            decoder.codec_context->width, decoder.codec_context->height,
+            0, GL_RGB, GL_UNSIGNED_BYTE, show_frame->data[0]);
+        
+        decoder.return_frame(show_frame);
+        
+        glBegin(GL_QUADS);
+        {
+            glTexCoord2f(0,1);
+            glVertex2f(-1,-1);
+            
+            glTexCoord2f(0,0);
+            glVertex2f(-1,1);
+            
+            glTexCoord2f(1,0);
+            glVertex2f(1,1);
+            
+            glTexCoord2f(1,1);
+            glVertex2f(1,-1);
+        }
+        glEnd();
+        
+        glfwSwapBuffers(window);
     }
     
-    //av_free(buffer);
-    //av_free(frame_rgb);
-    //av_free(frame);
-    
-    //avcodec_close(codec_context);
-    
-    //avformat_close_input(&format_context);
-    
+end_of_video:
     decoder.set_quit();
     decoder.join();
     glfwTerminate();
