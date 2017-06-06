@@ -15,6 +15,8 @@ bool Decoder::open(const std::string& path)
 {
     if(avformat_open_input(&format_context, path.c_str(), NULL, NULL) != 0)
     {
+        perror("avformat_open_input");
+        cerr << "PATH " << path << '\n';
         cerr << "Failed to open file\n";
         return false;
     }

@@ -53,6 +53,14 @@ struct Decoder
     // opens a video file, returning true if successful
     bool open(const std::string& file_path);
     
+    void seek(int64_t seek_to)
+    {
+        pthread_mutex_lock(&mutex);
+        av_seek_frame(format_context, video_stream_index, 
+            seek_to, AVSEEK_FLAG_ANY);
+        pthread_mutex_unlock(&mutex);
+    }
+    
     void lock()
     {
         pthread_mutex_lock(&mutex);

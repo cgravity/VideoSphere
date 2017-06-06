@@ -5,6 +5,12 @@ extern "C" {
 #include <libavutil/time.h>
 }
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
 #include <pthread.h>
 
 #include <iostream>
@@ -14,6 +20,7 @@ extern "C" {
 using namespace std;
 
 #include "decoder.h"
+#include "network.h"
 
 #include <GLFW/glfw3.h>
 
@@ -51,12 +58,20 @@ void on_window_resize(GLFWwindow* window, int w, int h)
 
 int main(int argc, char* argv[]) 
 {
-    if(argc != 2)
+    if(argc != 3)
     {
-        cerr << "USAGE: ./video_sphere <path-to-video>\n";
+        cerr << "USAGE: ./video_sphere --server <path-to-video>\n";
+        cerr << "or\n";
+        cerr << "USAGE: ./video_sphere --client <hostname-or-ip>\n";
         return EXIT_FAILURE;
     }
-
+    
+    av_register_all();
+    avcodec_register_all();
+    
+    int64_t start = av_gettime_relative();
+    int64_t now;
+    
 #if 0
     PaError paerror = Pa_Initialize();
     if(paerror != paNoError)
@@ -66,18 +81,88 @@ int main(int argc, char* argv[])
     }
 #endif
 
-    av_register_all();
-    avcodec_register_all();
+    Server* server = NULL;
+    Client* client = NULL;
+    NetworkThread* nt = NULL;
     
     Decoder decoder;
-    bool ok = decoder.open(argv[1]);
     
-    if(!ok)
-        return EXIT_FAILURE;
-    
+    if(string(argv[1]) == "--server")
+    {
+        server = new Server();
+        nt = server;
+        nt->start_thread();
+            
+        bool ok = decoder.open(argv[2]);
+        
+        if(!ok)
+            return EXIT_FAILURE;    
+        
+        decoder.add_fillable_frames(24*5);
+        decoder.start_thread();
+    }
+    else if(string(argv[1]) == "--client")
+    {
+        client = new Client(argv[2], 2345);
+        nt = client;
+        nt->start_thread();
+        
+        nt->send("HELLO");
+        
+        cout << "Waiting for path...\n";
+        
+        string path = "";
+        int64_t seek_to = 0;
+        
+        while(path == "" && seek_to == 0)
+        {
+            vector<Message> msgs;
+            client->get_messages(msgs);
+            
+            for(size_t i = 0; i < msgs.size(); i++)
+            {
+                Message& m = msgs[i];
+                
+                if(m.size() == 0)
+                    continue; // empty message
+                
+                if(m.bytes[0] == 'S')
+                {
+                    if(m.size() != sizeof(int64_t) + 1)
+                    {
+                        cerr << "Invalid network seek at client start!\n";
+                        continue;
+                    }
+                    
+                    seek_to = *(int64_t*)&m.bytes[1];
+                    continue;
+                }
+                
+                if(m.bytes[0] == 'P')
+                {
+                    path = m.as_string().c_str() + 1;
+                    continue;
+                }
+            }
+        }
+        
+        bool ok = decoder.open(path);
+        
+        if(!ok)
+        {
+            cerr << "Can't open that path!\n";
+            return EXIT_FAILURE;   
+        }
+        
+        decoder.add_fillable_frames(24*5);
+        decoder.start_thread();
+        decoder.seek(seek_to);
+        
+        start = av_gettime_relative() - seek_to;
+        now = seek_to;
+    }
+
     // 10 seconds of buffer is ~750MB if video size is 1920x1080
-    decoder.add_fillable_frames(24*5);
-    decoder.start_thread();
     
     GLFWwindow* window;
     
@@ -109,15 +194,16 @@ int main(int argc, char* argv[])
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     
+    
     int i = 0;
     
-    int64_t start = av_gettime_relative();
-    int64_t now;
     
     
     bool decoded_all = false;
     
     double current_frame_end = -1;
+    
+    vector<Message> messages;
     
     while(true)
     {
@@ -133,6 +219,49 @@ int main(int argc, char* argv[])
         now = av_gettime_relative() - start;
         
         double now_f = now / 1000000.0;
+        
+        // FIXME: factor out message parsing. Handle client/server separately?
+        nt->get_messages(messages);
+        for(size_t i = 0; i < messages.size(); i++)
+        {
+            Message& m = messages[i];
+            if(m.size() == 0)
+            {
+                cerr << "Error: Empty network message\n";
+                continue;
+            }
+            
+            if(m.as_string()[0] == 'S') // seek
+            {
+                if(m.size() != sizeof(int64_t) + 1)
+                {
+                    cerr << "Error: Invalid network seek\n";
+                    continue;
+                }
+                
+                int64_t value = *(int64_t*)&m.bytes[1];
+                decoder.seek(value);
+            }
+            else if(m.as_string() == "HELLO")
+            {
+                // new connection -- sent it 
+                string p = "P" + string(argv[2]);
+                vector<unsigned char> s;
+                
+                int64_t seek = now;
+                seek *= decoder.time_base.den;
+                seek /= decoder.time_base.num;
+                
+                s.push_back((unsigned char)'S');
+                for(size_t i = 0; i < sizeof(now); i++)
+                {
+                    s.push_back(*((unsigned char*)&seek + i));
+                }
+                
+                m.reply(p);
+                m.reply(s);
+            }
+        }
         
         AVFrame* show_frame = NULL;
         AVFrame* show_frame_prev = NULL;
