@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
     avcodec_register_all();
     
     int64_t start = av_gettime_relative();
-    int64_t now;
+    int64_t now = 0;
     
 #if 0
     PaError paerror = Pa_Initialize();
@@ -112,9 +112,8 @@ int main(int argc, char* argv[])
         cout << "Waiting for path...\n";
         
         string path = "";
-        int64_t seek_to = 0;
         
-        while(path == "" && seek_to == 0)
+        while(path == "" || now == 0)
         {
             vector<Message> msgs;
             client->get_messages(msgs);
@@ -134,7 +133,14 @@ int main(int argc, char* argv[])
                         continue;
                     }
                     
-                    seek_to = *(int64_t*)&m.bytes[1];
+                    char* out = (char*)&now;
+                    char* in  = (char*)&m.bytes[1];
+                    
+                    for(size_t j = 0; j < sizeof(int64_t); j++)
+                        *out++ = *in++;
+                    
+                    start = av_gettime_relative() - now;
+                    
                     continue;
                 }
                 
@@ -156,10 +162,19 @@ int main(int argc, char* argv[])
         
         decoder.add_fillable_frames(24*5);
         decoder.start_thread();
+        
+        // now is set in microseconds (assuming AV_TIME_BASE = 1000000)
+        // decoder.time_base is a fraction (in seconds) per frame
+        // discrete ticks of it are times to seek to?
+        
+        int64_t seek_to = av_rescale(now, 
+            decoder.time_base.den, decoder.time_base.num);
+        
+        seek_to /= AV_TIME_BASE;
+        
         decoder.seek(seek_to);
         
-        start = av_gettime_relative() - seek_to;
-        now = seek_to;
+        cout << "SEEK TO: " << seek_to << '\n';
     }
 
     // 10 seconds of buffer is ~750MB if video size is 1920x1080
@@ -248,14 +263,17 @@ int main(int argc, char* argv[])
                 string p = "P" + string(argv[2]);
                 vector<unsigned char> s;
                 
-                int64_t seek = now;
-                seek *= decoder.time_base.den;
-                seek /= decoder.time_base.num;
+//                int64_t seek = av_rescale(now, decoder.time_base.den,
+//                    decoder.time_base.num);
                 
                 s.push_back((unsigned char)'S');
+                
+                cout << "Now: " << now << '\n';
+                unsigned char* ptr = (unsigned char*)& now;
                 for(size_t i = 0; i < sizeof(now); i++)
                 {
-                    s.push_back(*((unsigned char*)&seek + i));
+                    s.push_back(*ptr);
+                    ptr++;
                 }
                 
                 m.reply(p);
@@ -282,7 +300,7 @@ int main(int argc, char* argv[])
             
             if(!show_frame)
             {
-                cerr << "Playing faster than decode\n";
+                //cerr << "Playing faster than decode\n";
                 break;
             }
             
@@ -333,6 +351,7 @@ int main(int argc, char* argv[])
     }
     
 end_of_video:
+    cout << "end of video detected\n";
     decoder.set_quit();
     decoder.join();
     glfwTerminate();

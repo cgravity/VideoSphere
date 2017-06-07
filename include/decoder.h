@@ -11,6 +11,8 @@ extern "C" {
 #include <list>
 #include <string>
 
+#include <iostream>
+
 struct Decoder
 {
     pthread_mutex_t mutex;     // lock for exclusive access to rest of struct
@@ -58,6 +60,13 @@ struct Decoder
         pthread_mutex_lock(&mutex);
         av_seek_frame(format_context, video_stream_index, 
             seek_to, AVSEEK_FLAG_ANY);
+        
+//        if(avformat_seek_file(format_context, video_stream_index, 0,
+//            seek_to, seek_to, 0) < 0)
+//        {
+//            std::cerr << "Seek failed\n";
+//        }
+        
         pthread_mutex_unlock(&mutex);
     }
     
