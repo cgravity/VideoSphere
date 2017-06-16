@@ -14,6 +14,8 @@ extern "C" {
 #include <pthread.h>
 
 #include <iostream>
+#include <sstream>
+#include <fstream>
 #include <cstdio>
 #include <cstdlib>
 #include <list>
@@ -22,6 +24,7 @@ using namespace std;
 #include "decoder.h"
 #include "network.h"
 
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 // USE FFMPEG 3.3.1
@@ -54,6 +57,119 @@ void SaveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
 void on_window_resize(GLFWwindow* window, int w, int h)
 {
     glViewport(0,0,w,h);
+}
+
+string slurp(const string& filename)
+{
+    ifstream src(filename.c_str());
+    
+    if(src.fail())
+    {
+        cerr << "Failed to load: " << filename << "\n";
+        exit(EXIT_FAILURE);
+    }
+    
+    stringstream buffer;
+    buffer << src.rdbuf();
+    
+    return buffer.str();
+}
+
+bool endswith(const string& data, const string& pattern)
+{
+    if(data.size() < pattern.size())
+        return false;
+    
+    const char* data_str = data.c_str();
+    data_str += data.size() - pattern.size();
+    
+    const char* pattern_str = pattern.c_str();
+    while(*pattern_str)
+    {
+        if(tolower(*data_str) != tolower(*pattern_str))
+            return false;
+        
+        pattern_str++;
+        data_str++;
+    }
+    
+    return true;
+}
+
+
+// given a list of filenames, loads files, compiles, and links them
+// returns the program id if successful, or quits with error if not
+GLuint load_shaders(vector<string> filenames)
+{
+    GLint program = glCreateProgram();
+    
+    for(size_t i = 0; i < filenames.size(); i++)
+    {
+        string src = slurp(filenames[i]);
+        const char* src_c = src.c_str();
+        
+        GLint type = 0;
+        
+        if(endswith(filenames[i], ".frag"))
+            type = GL_FRAGMENT_SHADER;
+        else if(endswith(filenames[i], ".vert"))
+            type = GL_VERTEX_SHADER;
+        else
+        {
+            cerr << "Unsupported shader type!\n";
+            cerr << "File: " << filenames[i] << '\n';
+            exit(EXIT_FAILURE);
+        }
+        
+        GLuint shader = glCreateShader(type);
+        glShaderSource(shader, 1, &src_c, NULL);
+        glCompileShader(shader);
+        
+        GLint shader_success = 0;
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &shader_success);
+        
+        if(shader_success == GL_FALSE)
+        {
+            cerr << "Failed to compile shader!\n";
+            cerr << "File: " << filenames[i] << '\n';
+            cerr << "Error:\n";
+            
+            GLint logSize = 0;
+            glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logSize);
+            
+            char* error_msg = (char*)malloc(logSize);
+            
+            glGetShaderInfoLog(shader, logSize, NULL, error_msg);
+            cerr << error_msg << '\n';
+            
+            free(error_msg);
+            exit(EXIT_FAILURE);
+        }
+        
+        glAttachShader(program, shader);
+    }    
+    
+    glLinkProgram(program);
+    
+    GLint success = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if(success == GL_FALSE)
+    {
+        cerr << "Failed to link shaders!\n";
+        
+        GLint logSize = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logSize);
+        
+        char* error_msg = (char*)malloc(logSize);
+        
+        glGetProgramInfoLog(program, logSize, NULL, error_msg);
+        cerr << error_msg << '\n';
+        
+        free(error_msg);
+        exit(EXIT_FAILURE);
+    }
+    
+    return program;
 }
 
 int main(int argc, char* argv[]) 
@@ -197,6 +313,37 @@ int main(int argc, char* argv[])
     }
     
     glfwMakeContextCurrent(window);
+    
+    // initialize GLEW
+    GLenum glew_error = glewInit();
+    if (GLEW_OK != glew_error)
+    {
+      cerr << "GLEW Error: " << glewGetErrorString(glew_error);
+      glfwTerminate();
+      return EXIT_FAILURE;
+    }
+    
+    // load shaders
+    vector<string> no_distort_files;
+    no_distort_files.push_back("shaders/no-distort.vert");
+    no_distort_files.push_back("shaders/no-distort.frag");
+    
+    GLint no_distort_program = load_shaders(no_distort_files);
+    
+    
+    vector<string> mono_equirect_files;
+    mono_equirect_files.push_back("shaders/simple-mono.vert");
+    mono_equirect_files.push_back("shaders/simple-mono.frag");
+    
+    GLint mono_equirect_program = load_shaders(mono_equirect_files);
+    
+    
+    // select which shader to use
+    GLint shader_program = mono_equirect_program;
+    
+    
+    GLint pos = glGetAttribLocation(shader_program, "pos_in");
+    
     glfwSetWindowSizeCallback(window, on_window_resize);
     
     glEnable(GL_TEXTURE_2D);
@@ -331,19 +478,28 @@ int main(int argc, char* argv[])
         
         decoder.return_frame(show_frame);
         
+        glUseProgram(shader_program);
+        
+        // for 'pos', using convention where x goes to the right, y goes in,
+        // and z goes up.
         glBegin(GL_QUADS);
         {
-            glTexCoord2f(0,1);
-            glVertex2f(-1,-1);
+            //glTexCoord2f(0,1);
+            glVertexAttrib3f(pos, -11, 1.5, 6);
+            glVertex2f(-1, 1);
             
-            glTexCoord2f(0,0);
-            glVertex2f(-1,1);
-            
-            glTexCoord2f(1,0);
-            glVertex2f(1,1);
-            
-            glTexCoord2f(1,1);
+            //glTexCoord2f(0,0);
+            glVertexAttrib3f(pos, -11, 1.5, -6);
+            glVertex2f(-1, -1);
+
+            //glTexCoord2f(1,0);
+            glVertexAttrib3f(pos, 11, 1.5, -6);
             glVertex2f(1,-1);
+            
+            //glTexCoord2f(1,1);
+            glVertexAttrib3f(pos, 11, 1.5, 6);
+            glVertex2f(1,1);
+            //glVertexAttrib3f(pos, 5,1,5);
         }
         glEnd();
         
