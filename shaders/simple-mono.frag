@@ -23,9 +23,9 @@ void main()
     vec2 latlong = vec3_to_latlong(normalize(pos));
     
     float lat = latlong.x;
-    float long = latlong.y;
+    float lon = latlong.y;
     
-    float x = long / TURN;
+    float x = lon / TURN;
     float y = ((lat / (0.25*TURN) + 1.0)) / 2.0;
     
     gl_FragColor = texture2D(video_texture, vec2(1-x,1-y));

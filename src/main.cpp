@@ -330,7 +330,7 @@ int main(int argc, char* argv[])
     no_distort_files.push_back("shaders/no-distort.vert");
     no_distort_files.push_back("shaders/no-distort.frag");
     
-    GLint no_distort_program = load_shaders(no_distort_files);
+    //GLint no_distort_program = load_shaders(no_distort_files);
     
     
     vector<string> mono_equirect_files;

@@ -2,7 +2,7 @@
 
 uniform float theta;
 uniform float phi;
-in vec3 pos_in;
+attribute vec3 pos_in;
 varying vec3 pos;
 
 // http://www.neilmendoza.com/glsl-rotation-about-an-arbitrary-axis/
