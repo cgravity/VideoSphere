@@ -311,7 +311,7 @@ GLuint load_shaders(vector<string> filenames)
     return program;
 }
 
-int main(int argc, char* argv[]) 
+void test_screen_parse()
 {
     vector<Screen> screens;
     parse_calvr_screen_config(screens, "../../data/wave-full-screens.xml",
@@ -323,15 +323,124 @@ int main(int argc, char* argv[])
     {
         screens[i].debug_print();
     }
+}
+
+enum NetworkType
+{
+    NT_UNDEFINED,
+    NT_SERVER,
+    NT_CLIENT
+};
+
+struct Args
+{
+    NetworkType type;
+    vector<Screen> screens; // used by client to list screen properties
     
-    return 0;
+    string video_path;     // used by server or client to indicate video path
+                           // by default, clients will get this from server
+                           // so should usually only be set on server.
+                           // If set on client, client ignores path from server.
+                           
+    string server_address; // used by clients to indicate server ip/hostnam
+    string config_path;    // used by clients to indicate path to CalVR config
+    string hostname;       // used by clients to indicate name in CalVR config
+};
 
-
-    if(argc != 3)
+void parse_args(Args& args, int argc, char* argv[])
+{
+    for(int i = 0; i < argc; i++)
     {
-        cerr << "USAGE: ./video_sphere --server <path-to-video>\n";
+        if(argv[i] == string("--server"))
+        {
+            args.type = NT_SERVER;
+            continue;
+        }
+        
+        if(argv[i] == string("--client"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected hostname or ip of server after --client");
+            
+            args.server_address = argv[i];
+            continue;
+        }
+        
+        if(argv[i] == string("--video"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected path to video after --video");
+            
+            args.video_path = argv[i];
+            continue;
+        }
+        
+        if(argv[i] == string("--config"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected path to screen config xml after --config");
+            
+            args.config_path = argv[i];
+            continue;
+        }
+        
+        if(argv[i] == string("--host"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected explicit hostname after --host");
+            
+            args.hostname = argv[i];
+            continue;
+        }
+    }
+    
+    // sanity checks
+    if(args.type == NT_UNDEFINED)
+        fatal("must use one of --server or --client as an argument!");
+    
+    if(args.type == NT_SERVER && args.video_path.size()==0)
+        fatal("--video [path] is required for servers!");
+    
+    if(args.type == NT_CLIENT && !args.server_address.size()==0)
+        fatal("clients must provide IP or hostname of server!");
+    
+    if(args.type == NT_CLIENT && args.config_path.size()==0)
+        fatal("clients must provide --config [path] arguments!");
+    
+    
+    if(args.hostname.size()==0)
+    {
+        // automatically get hostname if not explicitly specified
+        char buffer[1024];
+        gethostname(buffer, sizeof(buffer));
+        buffer[sizeof(buffer)-1] = 0; // make sure null terminated
+        args.hostname = buffer;
+    }
+    
+    if(args.config_path.size())
+    {
+        parse_calvr_screen_config(
+            args.screens, 
+            args.config_path,
+            args.hostname);
+        
+        if(args.screens.size() == 0)
+            fatal("Failed to find any screens in config file for host: " +
+                args.hostname);
+    }
+}
+
+int main(int argc, char* argv[]) 
+{
+    if(argc < 3)
+    {
+        cerr << "USAGE: ./video_sphere --server --video <path-to-video>\n";
         cerr << "or\n";
-        cerr << "USAGE: ./video_sphere --client <hostname-or-ip>\n";
+        cerr << "USAGE: ./video_sphere --client <hostname-or-ip> --config <path> [--host <host>]\n";
         return EXIT_FAILURE;
     }
     
@@ -350,19 +459,22 @@ int main(int argc, char* argv[])
     }
 #endif
 
+    Args args;
+    parse_args(args, argc, argv);
+
     Server* server = NULL;
     Client* client = NULL;
     NetworkThread* nt = NULL;
     
     Decoder decoder;
     
-    if(string(argv[1]) == "--server")
+    if(args.type == NT_SERVER)
     {
         server = new Server();
         nt = server;
         nt->start_thread();
             
-        bool ok = decoder.open(argv[2]);
+        bool ok = decoder.open(args.video_path);
         
         if(!ok)
             return EXIT_FAILURE;    
@@ -370,7 +482,7 @@ int main(int argc, char* argv[])
         decoder.add_fillable_frames(24*5);
         decoder.start_thread();
     }
-    else if(string(argv[1]) == "--client")
+    else if(args.type == NT_CLIENT)
     {
         client = new Client(argv[2], 2345);
         nt = client;
@@ -421,6 +533,10 @@ int main(int argc, char* argv[])
             }
         }
         
+        // explicitly passed path overrides network request
+        if(args.video_path.size())
+            path = args.video_path;
+            
         bool ok = decoder.open(path);
         
         if(!ok)
@@ -444,6 +560,11 @@ int main(int argc, char* argv[])
         decoder.seek(seek_to);
         
         cout << "SEEK TO: " << seek_to << '\n';
+    }
+    else
+    {
+        cerr << "You must specify --client or --server!\n";
+        exit(EXIT_FAILURE);
     }
 
     // 10 seconds of buffer is ~750MB if video size is 1920x1080
