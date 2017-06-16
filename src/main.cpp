@@ -27,6 +27,8 @@ using namespace std;
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#define TURN (2*3.1415926535)
+
 // USE FFMPEG 3.3.1
 // USE PortAudio pa_stable_v190600_20161030
 
@@ -304,7 +306,7 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
     
-    window = glfwCreateWindow(640, 360, "Video Sphere", NULL, NULL);
+    window = glfwCreateWindow(1920/2, 1080/2, "Video Sphere", NULL, NULL);
     if(!window)
     {
         glfwTerminate();
@@ -341,8 +343,14 @@ int main(int argc, char* argv[])
     // select which shader to use
     GLint shader_program = mono_equirect_program;
     
-    
+    GLint theta_ = glGetUniformLocation(shader_program, "theta");
+    GLint phi_   = glGetUniformLocation(shader_program, "phi");
     GLint pos = glGetAttribLocation(shader_program, "pos_in");
+    
+    float theta = 0.0;
+    float phi = 0.0;
+    
+    glUseProgram(shader_program);
     
     glfwSetWindowSizeCallback(window, on_window_resize);
     
@@ -367,12 +375,67 @@ int main(int argc, char* argv[])
     
     vector<Message> messages;
     
+    bool left_down = false;
+    bool right_down = false;
+    bool up_down = false;
+    bool down_down = false;
+    
     while(true)
     {
         glfwPollEvents();
         
         if(glfwGetKey(window, GLFW_KEY_ESCAPE))
             break;
+        
+        if(glfwGetKey(window, GLFW_KEY_LEFT))
+        {
+            if(!left_down)
+                theta -= TURN / 100;
+            
+            left_down = true;
+        }
+        else
+            left_down = false;
+        
+        if(glfwGetKey(window, GLFW_KEY_RIGHT))
+        {
+            if(!right_down)
+                theta += TURN / 100;
+            
+            right_down = true;
+        }
+        else
+            right_down = false;
+        
+        if(glfwGetKey(window, GLFW_KEY_UP))
+        {
+            if(!up_down)
+                phi -= (TURN/4) / 10.0;
+            
+            up_down = true;
+        }
+        else
+            up_down = false;
+        
+        if(glfwGetKey(window, GLFW_KEY_DOWN))
+        {
+            if(!down_down)
+                phi += (TURN/4) / 10.0;
+            
+            down_down = true;
+        }
+        else
+            down_down = false;
+        
+        theta = fmod(theta, TURN);
+        if(theta < 0)
+            theta += TURN;
+        //printf("%0.0f\n", 180 / M_PI * theta);
+        
+        if(phi > TURN/4)
+            phi = TURN/4;
+        else if(phi < -TURN/4)
+            phi = -TURN/4;
         
         decoder.lock();
         decoded_all = decoder.decoded_all_flag;
@@ -478,28 +541,25 @@ int main(int argc, char* argv[])
         
         decoder.return_frame(show_frame);
         
-        glUseProgram(shader_program);
         
         // for 'pos', using convention where x goes to the right, y goes in,
         // and z goes up.
+        glUniform1f(theta_, theta);
+        glUniform1f(phi_, phi);
+        
         glBegin(GL_QUADS);
         {
-            //glTexCoord2f(0,1);
-            glVertexAttrib3f(pos, -11, 1.5, 6);
+            glVertexAttrib3f(pos, -11, 2*1.5, 6);
             glVertex2f(-1, 1);
             
-            //glTexCoord2f(0,0);
-            glVertexAttrib3f(pos, -11, 1.5, -6);
+            glVertexAttrib3f(pos, -11, 2*1.5, -6);
             glVertex2f(-1, -1);
 
-            //glTexCoord2f(1,0);
-            glVertexAttrib3f(pos, 11, 1.5, -6);
+            glVertexAttrib3f(pos, 11, 2*1.5, -6);
             glVertex2f(1,-1);
             
-            //glTexCoord2f(1,1);
-            glVertexAttrib3f(pos, 11, 1.5, 6);
+            glVertexAttrib3f(pos, 11, 2*1.5, 6);
             glVertex2f(1,1);
-            //glVertexAttrib3f(pos, 5,1,5);
         }
         glEnd();
         
