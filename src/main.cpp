@@ -435,6 +435,32 @@ void parse_args(Args& args, int argc, char* argv[])
     }
 }
 
+void monitor_test()
+{
+    int count = 0;
+    GLFWmonitor** monitors = glfwGetMonitors(&count);
+    
+    int x, y;
+    
+    cout << " --- Monitor Debug ---\n";
+    
+    for(int i = 0; i < count; i++)
+    {
+        cout << "Monitor " << i << ": " << glfwGetMonitorName(monitors[i])
+             << '\n';
+        
+        glfwGetMonitorPos(monitors[i], &x, &y);
+        
+        cout << "Pixel pos: " << x << ", " << y << '\n';
+        
+        glfwGetMonitorPhysicalSize(monitors[i], &x, &y);
+        
+        cout << "Phys size: " << x << ", " << y << '\n';
+    }
+    
+    cout << " --- End Monitor Debug ---\n";
+}
+
 int main(int argc, char* argv[]) 
 {
     if(argc < 3)
@@ -507,30 +533,51 @@ int main(int argc, char* argv[])
                 if(m.size() == 0)
                     continue; // empty message
                 
-                if(m.bytes[0] == 'S')
+                try
                 {
-                    if(m.size() != sizeof(int64_t) + 1)
+                    char type = m.read_char();
+                    
+                    switch(type)
                     {
-                        cerr << "Invalid network seek at client start!\n";
-                        continue;
+                        case 'S':
+                            now = m.read_int64();
+                            start = av_gettime_relative() - now;
+                            break;
+                            
+                        case 'P':
+                            path = m.read_string();
+                            break;
                     }
-                    
-                    char* out = (char*)&now;
-                    char* in  = (char*)&m.bytes[1];
-                    
-                    for(size_t j = 0; j < sizeof(int64_t); j++)
-                        *out++ = *in++;
-                    
-                    start = av_gettime_relative() - now;
-                    
-                    continue;
                 }
-                
-                if(m.bytes[0] == 'P')
+                catch(ParseError pe)
                 {
-                    path = m.as_string().c_str() + 1;
-                    continue;
-                }
+                    cerr << "Client start network parser error: " << pe.what() << '\n';
+                }   
+                
+//                if(m.bytes[0] == 'S')
+//                {
+//                    if(m.size() != sizeof(int64_t) + 1)
+//                    {
+//                        cerr << "Invalid network seek at client start!\n";
+//                        continue;
+//                    }
+//                    
+//                    char* out = (char*)&now;
+//                    char* in  = (char*)&m.bytes[1];
+//                    
+//                    for(size_t j = 0; j < sizeof(int64_t); j++)
+//                        *out++ = *in++;
+//                    
+//                    start = av_gettime_relative() - now;
+//                    
+//                    continue;
+//                }
+//                
+//                if(m.bytes[0] == 'P')
+//                {
+//                    path = m.as_string().c_str() + 1;
+//                    continue;
+//                }
             }
         }
         
@@ -586,6 +633,8 @@ int main(int argc, char* argv[])
         cerr << "Failed to init GLFW3\n";
         return EXIT_FAILURE;
     }
+    
+    monitor_test();
     
     window = glfwCreateWindow(1920/2, 1080/2, "Video Sphere", NULL, NULL);
     if(!window)
@@ -730,47 +779,78 @@ int main(int argc, char* argv[])
         nt->get_messages(messages);
         for(size_t i = 0; i < messages.size(); i++)
         {
-            Message& m = messages[i];
-            if(m.size() == 0)
+            try
             {
-                cerr << "Error: Empty network message\n";
-                continue;
-            }
-            
-            if(m.as_string()[0] == 'S') // seek
-            {
-                if(m.size() != sizeof(int64_t) + 1)
+                Message& m = messages[i];
+                if(m.size() == 0)
                 {
-                    cerr << "Error: Invalid network seek\n";
+                    cerr << "Error: Empty network message\n";
                     continue;
                 }
                 
-                int64_t value = *(int64_t*)&m.bytes[1];
-                decoder.seek(value);
-            }
-            else if(m.as_string() == "HELLO")
-            {
-                // new connection -- sent it 
-                string p = "P" + string(args.video_path);
-                vector<unsigned char> s;
-                
-//                int64_t seek = av_rescale(now, decoder.time_base.den,
-//                    decoder.time_base.num);
-                
-                s.push_back((unsigned char)'S');
-                
-                cout << "Now: " << now << '\n';
-                unsigned char* ptr = (unsigned char*)& now;
-                for(size_t i = 0; i < sizeof(now); i++)
+                if(m.as_string() == "HELLO")
                 {
-                    s.push_back(*ptr);
-                    ptr++;
+                    // new connection
+                    // send the video path and seek time
+                    Message path;
+                    Message seek;
+                    
+                    path.write_char('P');
+                    path.write_string(args.video_path);
+                    
+                    seek.write_char('S');
+                    seek.write_int64(now);
+                    
+                    m.reply(path);
+                    m.reply(seek);
+                    
+//                    cout << "Now: " << now << '\n';
+//                    unsigned char* ptr = (unsigned char*)& now;
+//                    for(size_t i = 0; i < sizeof(now); i++)
+//                    {
+//                        s.push_back(*ptr);
+//                        ptr++;
+//                    }
+                    continue;
                 }
                 
-                m.reply(p);
-                m.reply(s);
+                char type = m.read_char();
+                
+                switch(type)
+                {
+                    case 'P':
+                    {
+                        cerr << "Network path value sent at inappropriate time\n";
+                        continue;
+                    }
+                    break;
+                    
+                    case 'S':
+                    {
+                        int64_t value = m.read_int64();
+                        decoder.seek(value);
+                    }
+                    break;
+                    
+                    case 'T':
+                    {
+                        phi = m.read_float();
+                        theta = m.read_float();
+                    }
+                    break;
+                    
+                    default:
+                        cerr << "Failed to parse message with type '"
+                             << type << "'\n";
+                        continue;
+                }
+            
+            } // try
+            catch(ParseError pe)
+            {
+                cerr << "Network parse error: " << pe.what() << '\n';
             }
-        }
+        } // for each message
         
         AVFrame* show_frame = NULL;
         AVFrame* show_frame_prev = NULL;

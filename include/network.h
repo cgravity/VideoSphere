@@ -68,6 +68,11 @@ struct Message
         ::send(fd, &data[0], data.size(), 0);
     }
     
+    void reply(const Message& m)
+    {
+        reply(m.bytes);
+    }
+    
     // message parsing
     int parse_pos;
     
