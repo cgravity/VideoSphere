@@ -363,6 +363,7 @@ void parse_args(Args& args, int argc, char* argv[])
             if(i >= argc)
                 fatal("expected hostname or ip of server after --client");
             
+            args.type = NT_CLIENT;
             args.server_address = argv[i];
             continue;
         }
@@ -405,7 +406,7 @@ void parse_args(Args& args, int argc, char* argv[])
     if(args.type == NT_SERVER && args.video_path.size()==0)
         fatal("--video [path] is required for servers!");
     
-    if(args.type == NT_CLIENT && !args.server_address.size()==0)
+    if(args.type == NT_CLIENT && args.server_address.size()==0)
         fatal("clients must provide IP or hostname of server!");
     
     if(args.type == NT_CLIENT && args.config_path.size()==0)
@@ -534,14 +535,22 @@ int main(int argc, char* argv[])
         }
         
         // explicitly passed path overrides network request
-        if(args.video_path.size())
+        if(args.video_path.size() > 0)
+        {
+            cout << "Using explicit path override\n";
             path = args.video_path;
+        }
+        else
+        {
+            cout << "Using network received path\n";
+        }
             
         bool ok = decoder.open(path);
         
         if(!ok)
         {
             cerr << "Can't open that path!\n";
+            cerr << "Path: " << path << '\n';
             return EXIT_FAILURE;   
         }
         
@@ -742,7 +751,7 @@ int main(int argc, char* argv[])
             else if(m.as_string() == "HELLO")
             {
                 // new connection -- sent it 
-                string p = "P" + string(argv[2]);
+                string p = "P" + string(args.video_path);
                 vector<unsigned char> s;
                 
 //                int64_t seek = av_rescale(now, decoder.time_base.den,
