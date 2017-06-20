@@ -19,6 +19,7 @@
 
 #include <pthread.h>
 #include <list>
+#include <stdexcept>
 
 struct Connection;
 
@@ -29,6 +30,11 @@ enum IncomingMsgState
     MSG_STATE_READING_DATA
 };
 
+struct ParseError : public std::runtime_error 
+{
+    ParseError(const std::string& what_arg) : std::runtime_error(what_arg) {};
+    ParseError(const char* what_arg) : std::runtime_error(what_arg) {};
+};
 
 struct Message
 {
@@ -61,6 +67,239 @@ struct Message
         ::send(fd, &size, sizeof(size), 0);
         ::send(fd, &data[0], data.size(), 0);
     }
+    
+    // message parsing
+    int parse_pos;
+    
+    void rewind()
+    {
+        parse_pos = 0;
+    }
+    
+    int32_t read_int32()
+    {
+        if(parse_pos+4 > bytes.size())
+            throw ParseError("Not enough bytes in message to read int32");
+        
+        int32_t result = 0;
+        
+        result |= bytes[parse_pos++] << 24;
+        result |= bytes[parse_pos++] << 16;
+        result |= bytes[parse_pos++] <<  8;
+        result |= bytes[parse_pos++];
+        
+        return result;
+    }
+    
+    uint32_t read_uint32()
+    {
+        if(parse_pos+4 > bytes.size())
+            throw ParseError("Not enough bytes in message to read uint32");
+        
+        uint32_t result = 0;
+        
+        result |= bytes[parse_pos++] << 24;
+        result |= bytes[parse_pos++] << 16;
+        result |= bytes[parse_pos++] <<  8;
+        result |= bytes[parse_pos++];
+        
+        return result;
+    }
+    
+    int64_t read_int64()
+    {
+        if(parse_pos+8 > bytes.size())
+            throw ParseError("Not enough bytes in message to read int64");
+        
+        int64_t result = 0;
+        result |= bytes[parse_pos++] << 56;
+        result |= bytes[parse_pos++] << 48;
+        result |= bytes[parse_pos++] << 40;
+        result |= bytes[parse_pos++] << 32;
+        result |= bytes[parse_pos++] << 24;
+        result |= bytes[parse_pos++] << 16;
+        result |= bytes[parse_pos++] <<  8;
+        result |= bytes[parse_pos++];
+        
+        return result;
+    }
+    
+    uint64_t read_uint64()
+    {
+        if(parse_pos+8 > bytes.size())
+            throw ParseError("Not enough bytes in message to read uint64");
+        
+        uint64_t result = 0;
+        result |= bytes[parse_pos++] << 56;
+        result |= bytes[parse_pos++] << 48;
+        result |= bytes[parse_pos++] << 40;
+        result |= bytes[parse_pos++] << 32;
+        result |= bytes[parse_pos++] << 24;
+        result |= bytes[parse_pos++] << 16;
+        result |= bytes[parse_pos++] <<  8;
+        result |= bytes[parse_pos++];
+        
+        return result;
+    }
+    
+    float read_float()
+    {
+        if(parse_pos+4 > bytes.size())
+            throw ParseError("Not enough bytes in message to read float");
+        
+        uint32_t result = 0;
+        
+        result |= bytes[parse_pos++] << 24;
+        result |= bytes[parse_pos++] << 16;
+        result |= bytes[parse_pos++] <<  8;
+        result |= bytes[parse_pos++];
+        
+        return *(float*)&result;
+    }
+    
+    double read_double()
+    {
+        if(parse_pos+8 > bytes.size())
+            throw ParseError("Not enough bytes in message to read double");
+        
+        uint64_t result = 0;
+        result |= bytes[parse_pos++] << 56;
+        result |= bytes[parse_pos++] << 48;
+        result |= bytes[parse_pos++] << 40;
+        result |= bytes[parse_pos++] << 32;
+        result |= bytes[parse_pos++] << 24;
+        result |= bytes[parse_pos++] << 16;
+        result |= bytes[parse_pos++] <<  8;
+        result |= bytes[parse_pos++];
+        
+        return *(double*)&result;
+    }
+    
+    char read_char()
+    {
+        if(parse_pos+1 > bytes.size())
+            throw ParseError("Not enough bytes in message to read char");
+        
+        return (char)bytes[parse_pos++];
+    }
+    
+    unsigned char read_byte()
+    {
+        if(parse_pos+1 > bytes.size())
+            throw ParseError("Not enough bytes in message to read byte");
+        
+        return bytes[parse_pos++];
+    }
+    
+    unsigned char read_uchar()
+    {
+        if(parse_pos+1 > bytes.size())
+            throw ParseError("Not enough bytes in message to read uchar");
+        
+        return bytes[parse_pos++];
+    }
+    
+    std::string read_string()
+    {
+        try 
+        {
+            uint32_t size = read_uint32();
+            std::string result;
+        
+            for(uint32_t i = 0; i < size; i++)
+            {
+                result.push_back(read_char());
+            }
+            
+            return result;
+        } 
+        catch(ParseError p)
+        {
+            throw ParseError("Failed to extract string from message");
+        }
+    }
+    
+    // message serialization
+    void write_byte(unsigned char value)
+    {
+        bytes.push_back(value);
+    }
+    
+    void write_uchar(unsigned char value)
+    {
+        write_byte(value);
+    }
+    
+    void write_char(char value)
+    {
+        write_byte((unsigned char)value);
+    }
+    
+    void write_uint32(uint32_t value)
+    {
+        write_byte((unsigned char)((value & 0xFF000000) >> 24));
+        write_byte((unsigned char)((value & 0x00FF0000) >> 16));
+        write_byte((unsigned char)((value & 0x0000FF00) >>  8));
+        write_byte((unsigned char)((value & 0x000000FF)));
+    }
+    
+    void write_int32(int32_t value)
+    {
+        write_uint32((uint32_t)value);
+    }
+    
+    void write_uint64(uint64_t value)
+    {
+        write_byte((unsigned char)((value & 0xFF00000000000000) >> 56));
+        write_byte((unsigned char)((value & 0x00FF000000000000) >> 48));
+        write_byte((unsigned char)((value & 0x0000FF0000000000) >> 40));
+        write_byte((unsigned char)((value & 0x000000FF00000000) >> 32));
+        write_byte((unsigned char)((value & 0x00000000FF000000) >> 24));
+        write_byte((unsigned char)((value & 0x0000000000FF0000) >> 16));
+        write_byte((unsigned char)((value & 0x000000000000FF00) >>  8));
+        write_byte((unsigned char)((value & 0x00000000000000FF)));
+    }
+    
+    void write_int64(int64_t value)
+    {
+        write_uint64((uint64_t)value);
+    }
+    
+    void write_float(float value)
+    {
+        uint32_t value2 = *(uint32_t*)&value;
+        write_uint32(value2);
+    }
+    
+    void write_double(double value)
+    {
+        uint64_t value2 = *(uint64_t*)&value;
+        write_uint64(value2);
+    }
+    
+    void write_string(const std::string& value)
+    {
+        if(value.size() > 0xFFFFFFFF)
+            throw std::runtime_error("string is too big to serialize");
+        
+        uint32_t size = (uint32_t)value.size();
+        write_uint32(size);
+        
+        for(size_t i = 0; i < value.size(); i++)
+            write_byte(value[i]);
+    }
+    
+    void write_string(const char* value)
+    {
+        write_string(std::string(value));
+    }
+    
+    void write_string(const char* value, uint32_t size)
+    {
+        write_string(std::string(value, size));
+    }
+    
+    Message() : fd(0), parse_pos(0) {}
 };
 
 struct Connection
