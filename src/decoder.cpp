@@ -180,7 +180,9 @@ continue_point:         // loop start
             {
                 avcodec_decode_video2(codec_context, yuv_frame, 
                     &frame_finished, &packet);
-                    
+                
+                av_free_packet(&packet);
+                
                 if(frame_finished)
                 {
                     sws_scale(
@@ -195,9 +197,14 @@ continue_point:         // loop start
                     rgb_frame->pts = yuv_frame->pts;
                     rgb_frame->pkt_duration = yuv_frame->pkt_duration;
                     
+                    av_frame_unref(yuv_frame);
                     goto finished_frame;
                 }
             } // if packet.stream_index == video_stream_index
+            else
+            {
+                av_free_packet(&packet);
+            }
         } // while av_read_frame
         
         lock();
