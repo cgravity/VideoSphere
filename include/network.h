@@ -457,6 +457,11 @@ class Server : public NetworkThread
             conns[i].send(data);
     }
     
+    virtual void send(const Message& m)
+    {
+        send(m.bytes);
+    }
+    
     virtual void start_thread();
     
     // don't call this directly; use start_thread()

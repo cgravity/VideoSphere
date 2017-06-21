@@ -714,13 +714,18 @@ int main(int argc, char* argv[])
     {
         glfwPollEvents();
         
+        bool send_pos = false;
+        
         if(glfwGetKey(window, GLFW_KEY_ESCAPE))
             break;
         
         if(glfwGetKey(window, GLFW_KEY_LEFT))
         {
             if(!left_down)
+            {
                 theta -= TURN / 25;
+                send_pos = true;
+            }
             
             left_down = true;
         }
@@ -730,7 +735,10 @@ int main(int argc, char* argv[])
         if(glfwGetKey(window, GLFW_KEY_RIGHT))
         {
             if(!right_down)
+            {
                 theta += TURN / 25;
+                send_pos = true;
+            }
             
             right_down = true;
         }
@@ -740,7 +748,10 @@ int main(int argc, char* argv[])
         if(glfwGetKey(window, GLFW_KEY_UP))
         {
             if(!up_down)
+            {
                 phi -= (TURN/4) / 10.0;
+                send_pos = true;
+            }
             
             up_down = true;
         }
@@ -750,7 +761,10 @@ int main(int argc, char* argv[])
         if(glfwGetKey(window, GLFW_KEY_DOWN))
         {
             if(!down_down)
+            {
                 phi += (TURN/4) / 10.0;
+                send_pos = true;
+            }
             
             down_down = true;
         }
@@ -766,6 +780,16 @@ int main(int argc, char* argv[])
             phi = TURN/4;
         else if(phi < -TURN/4)
             phi = -TURN/4;
+        
+        if(send_pos && args.type == NT_SERVER)
+        {
+            Message turn;
+            turn.write_byte('T');
+            turn.write_float(phi);
+            turn.write_float(theta);
+            
+            server->send(turn);
+        }
         
         decoder.lock();
         decoded_all = decoder.decoded_all_flag;
