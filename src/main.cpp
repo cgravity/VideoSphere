@@ -23,459 +23,38 @@ using namespace std;
 
 #include "decoder.h"
 #include "network.h"
+#include "screen.h"
+#include "player.h"
+#include "shader.h"
+#include "util.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include "rapidxml.hpp"
 
 #define TURN (2*3.1415926535)
 
 // USE FFMPEG 3.3.1
 // USE PortAudio pa_stable_v190600_20161030
 
-// see http://dranger.com/ffmpeg/tutorial01.html for reference
-
-void SaveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
-  FILE *pFile;
-  char szFilename[32];
-  int  y;
-  
-  // Open file
-  sprintf(szFilename, "frame%d.ppm", iFrame);
-  pFile=fopen(szFilename, "wb");
-  if(pFile==NULL)
-    return;
-  
-  // Write header
-  fprintf(pFile, "P6\n%d %d\n255\n", width, height);
-  
-  // Write pixel data
-  for(y=0; y<height; y++)
-    fwrite(pFrame->data[0]+y*pFrame->linesize[0], 1, width*3, pFile);
-  
-  // Close file
-  fclose(pFile);
-}
 
 void on_window_resize(GLFWwindow* window, int w, int h)
 {
     glViewport(0,0,w,h);
 }
 
-string slurp(const string& filename)
-{
-    ifstream src(filename.c_str());
-    
-    if(src.fail())
-    {
-        cerr << "Failed to load: " << filename << "\n";
-        exit(EXIT_FAILURE);
-    }
-    
-    stringstream buffer;
-    buffer << src.rdbuf();
-    
-    return buffer.str();
-}
-
-bool endswith(const string& data, const string& pattern)
-{
-    if(data.size() < pattern.size())
-        return false;
-    
-    const char* data_str = data.c_str();
-    data_str += data.size() - pattern.size();
-    
-    const char* pattern_str = pattern.c_str();
-    while(*pattern_str)
-    {
-        if(tolower(*data_str) != tolower(*pattern_str))
-            return false;
-        
-        pattern_str++;
-        data_str++;
-    }
-    
-    return true;
-}
-
-struct Screen
-{
-    int index;
-    
-    float width;
-    float height;
-    
-    float heading;
-    float pitch;
-    float roll;
-    
-    float originX;
-    float originY;
-    float originZ;
-    
-    Screen() : index(0), heading(0), pitch(0), roll(0),
-        originX(0), originY(0), originZ(0) {}
-        
-    void debug_print() const
-    {
-        cout << "Screen " << index << "\n"
-             << "  width:   " << width << '\n'
-             << "  height:  " << height << '\n'
-             << "\n"
-             << "  heading: " << heading << '\n'
-             << "  pitch:   " << pitch << '\n'
-             << "  roll:    " << roll << '\n'
-             << "\n"
-             << "  originX: " << originX << '\n'
-             << "  originY: " << originY << '\n'
-             << "  originZ: " << originZ << '\n';
-    }
-};
-
-bool parse_float(float& into, char* from)
-{
-    return sscanf(from, "%f", &into) == 1;
-}
-
-bool parse_int(int& into, char* from)
-{
-    return sscanf(from, "%d", &into) == 1;
-}
-
-void fatal(string why)
-{
-    cerr << why << '\n';
-    exit(EXIT_FAILURE);
-}
-
-void parse_float_attr(rapidxml::xml_node<char>* screen_node, float& into, string attr_name)
-{
-    rapidxml::xml_attribute<char>* attr;
-    
-    attr = screen_node->first_attribute(attr_name.c_str());
-    if(!attr)
-        fatal("Missing '" + attr_name +"' in screen config");
-    
-    if(!parse_float(into, attr->value()))
-        fatal("Failed to parse '" + attr_name + "' in screen config");
-}
-
-void parse_int_attr(rapidxml::xml_node<>* screen_node, int& into, string attr_name)
-{
-    rapidxml::xml_attribute<char>* attr;
-    
-    attr = screen_node->first_attribute(attr_name.c_str());
-    if(!attr)
-        fatal("Missing '" + attr_name +"' in screen config");
-    
-    if(!parse_int(into, attr->value()))
-        fatal("Failed to parse '" + attr_name + "' in screen config");
-}
-
-void parse_calvr_screen_config(vector<Screen>& screens_out, 
-    string filename, string host)
-{
-    using namespace rapidxml;
-    
-    string xml_source = slurp(filename);
-    
-    xml_document<> doc;
-    doc.parse<0>(&xml_source[0]);
-    
-    xml_node<>* node;
-    
-    for(node = doc.first_node("LOCAL"); node; node = node->next_sibling("LOCAL"))
-    {
-        xml_attribute<char>* attr = node->first_attribute("host");
-        if(!attr)
-            continue;
-        
-        if(host == attr->value())
-        {
-            break; // found node for this screen
-        }
-    }
-    
-    if(!node)
-    {
-        cerr << "Failed to find screen configuration for host: " << host << '\n';
-        exit(EXIT_FAILURE);
-    }
-    
-    xml_node<>* sc = node->first_node("ScreenConfig");
-    
-    if(!sc)
-        fatal("Failed to find ScreenConfig");
-    
-    xml_node<>* screen_node = sc->first_node("Screen");
-    
-    if(!screen_node)
-        fatal("Failed to find any Screen entries");
-    
-    while(screen_node)
-    {
-        Screen screen;
-        
-        parse_int_attr(screen_node, screen.index, "screen");
-        
-        parse_float_attr(screen_node, screen.width, "width");
-        parse_float_attr(screen_node, screen.height, "height");
-
-        parse_float_attr(screen_node, screen.heading, "h");
-        parse_float_attr(screen_node, screen.pitch, "p");
-        parse_float_attr(screen_node, screen.roll, "r");
-        
-        parse_float_attr(screen_node, screen.originX, "originX");
-        parse_float_attr(screen_node, screen.originY, "originY");
-        parse_float_attr(screen_node, screen.originZ, "originZ");
-        
-        screens_out.push_back(screen);
-        screen_node = screen_node->next_sibling("Screen");
-    }
-}
-
-// given a list of filenames, loads files, compiles, and links them
-// returns the program id if successful, or quits with error if not
-GLuint load_shaders(vector<string> filenames)
-{
-    GLint program = glCreateProgram();
-    
-    for(size_t i = 0; i < filenames.size(); i++)
-    {
-        string src = slurp(filenames[i]);
-        const char* src_c = src.c_str();
-        
-        GLint type = 0;
-        
-        if(endswith(filenames[i], ".frag"))
-            type = GL_FRAGMENT_SHADER;
-        else if(endswith(filenames[i], ".vert"))
-            type = GL_VERTEX_SHADER;
-        else
-        {
-            cerr << "Unsupported shader type!\n";
-            cerr << "File: " << filenames[i] << '\n';
-            exit(EXIT_FAILURE);
-        }
-        
-        GLuint shader = glCreateShader(type);
-        glShaderSource(shader, 1, &src_c, NULL);
-        glCompileShader(shader);
-        
-        GLint shader_success = 0;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &shader_success);
-        
-        if(shader_success == GL_FALSE)
-        {
-            cerr << "Failed to compile shader!\n";
-            cerr << "File: " << filenames[i] << '\n';
-            cerr << "Error:\n";
-            
-            GLint logSize = 0;
-            glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logSize);
-            
-            char* error_msg = (char*)malloc(logSize);
-            
-            glGetShaderInfoLog(shader, logSize, NULL, error_msg);
-            cerr << error_msg << '\n';
-            
-            free(error_msg);
-            exit(EXIT_FAILURE);
-        }
-        
-        glAttachShader(program, shader);
-    }    
-    
-    glLinkProgram(program);
-    
-    GLint success = 0;
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if(success == GL_FALSE)
-    {
-        cerr << "Failed to link shaders!\n";
-        
-        GLint logSize = 0;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logSize);
-        
-        char* error_msg = (char*)malloc(logSize);
-        
-        glGetProgramInfoLog(program, logSize, NULL, error_msg);
-        cerr << error_msg << '\n';
-        
-        free(error_msg);
-        exit(EXIT_FAILURE);
-    }
-    
-    return program;
-}
-
-void test_screen_parse()
-{
-    vector<Screen> screens;
-    parse_calvr_screen_config(screens, "../../data/wave-full-screens.xml",
-        "wave-2-2.local");
-    
-    
-    cout << "Screen count: " << screens.size() << "\n";
-    for(size_t i = 0; i < screens.size(); i++)
-    {
-        screens[i].debug_print();
-    }
-}
-
-enum NetworkType
-{
-    NT_UNDEFINED,
-    NT_SERVER,
-    NT_CLIENT
-};
-
-struct Args
-{
-    NetworkType type;
-    vector<Screen> screens; // used by client to list screen properties
-    
-    string video_path;     // used by server or client to indicate video path
-                           // by default, clients will get this from server
-                           // so should usually only be set on server.
-                           // If set on client, client ignores path from server.
-                           
-    string server_address; // used by clients to indicate server ip/hostnam
-    string config_path;    // used by clients to indicate path to CalVR config
-    string hostname;       // used by clients to indicate name in CalVR config
-};
-
-void parse_args(Args& args, int argc, char* argv[])
-{
-    for(int i = 0; i < argc; i++)
-    {
-        if(argv[i] == string("--server"))
-        {
-            args.type = NT_SERVER;
-            continue;
-        }
-        
-        if(argv[i] == string("--client"))
-        {
-            i++;
-            if(i >= argc)
-                fatal("expected hostname or ip of server after --client");
-            
-            args.type = NT_CLIENT;
-            args.server_address = argv[i];
-            continue;
-        }
-        
-        if(argv[i] == string("--video"))
-        {
-            i++;
-            if(i >= argc)
-                fatal("expected path to video after --video");
-            
-            args.video_path = argv[i];
-            continue;
-        }
-        
-        if(argv[i] == string("--config"))
-        {
-            i++;
-            if(i >= argc)
-                fatal("expected path to screen config xml after --config");
-            
-            args.config_path = argv[i];
-            continue;
-        }
-        
-        if(argv[i] == string("--host"))
-        {
-            i++;
-            if(i >= argc)
-                fatal("expected explicit hostname after --host");
-            
-            args.hostname = argv[i];
-            continue;
-        }
-    }
-    
-    // sanity checks
-    if(args.type == NT_UNDEFINED)
-        fatal("must use one of --server or --client as an argument!");
-    
-    if(args.type == NT_SERVER && args.video_path.size()==0)
-        fatal("--video [path] is required for servers!");
-    
-    if(args.type == NT_CLIENT && args.server_address.size()==0)
-        fatal("clients must provide IP or hostname of server!");
-    
-    if(args.type == NT_CLIENT && args.config_path.size()==0)
-        fatal("clients must provide --config [path] arguments!");
-    
-    
-    if(args.hostname.size()==0)
-    {
-        // automatically get hostname if not explicitly specified
-        char buffer[1024];
-        gethostname(buffer, sizeof(buffer));
-        buffer[sizeof(buffer)-1] = 0; // make sure null terminated
-        args.hostname = buffer;
-    }
-    
-    if(args.config_path.size())
-    {
-        parse_calvr_screen_config(
-            args.screens, 
-            args.config_path,
-            args.hostname);
-        
-        if(args.screens.size() == 0)
-            fatal("Failed to find any screens in config file for host: " +
-                args.hostname);
-    }
-}
-
-void monitor_test()
-{
-    int count = 0;
-    GLFWmonitor** monitors = glfwGetMonitors(&count);
-    
-    int x, y;
-    
-    cout << " --- Monitor Debug ---\n";
-    
-    for(int i = 0; i < count; i++)
-    {
-        cout << "Monitor " << i << ": " << glfwGetMonitorName(monitors[i])
-             << '\n';
-        
-        glfwGetMonitorPos(monitors[i], &x, &y);
-        
-        cout << "Pixel pos: " << x << ", " << y << '\n';
-        
-        glfwGetMonitorPhysicalSize(monitors[i], &x, &y);
-        
-        cout << "Phys size: " << x << ", " << y << '\n';
-    }
-    
-    cout << " --- End Monitor Debug ---\n";
-}
-
 int main(int argc, char* argv[]) 
-{
-    if(argc < 3)
-    {
-        cerr << "USAGE: ./video_sphere --server --video <path-to-video>\n";
-        cerr << "or\n";
-        cerr << "USAGE: ./video_sphere --client <hostname-or-ip> --config <path> [--host <host>]\n";
-        return EXIT_FAILURE;
-    }
+{    
+    Player player;
     
     av_register_all();
     avcodec_register_all();
     
-    int64_t start = av_gettime_relative();
-    int64_t now = 0;
+    int64_t& start = player.start;
+    int64_t& now = player.now;
+    
+    start = av_gettime_relative();
+    now = 0;
     
 #if 0
     PaError paerror = Pa_Initialize();
@@ -486,142 +65,15 @@ int main(int argc, char* argv[])
     }
 #endif
 
-    Args args;
-    parse_args(args, argc, argv);
+    parse_args(player, argc, argv);
 
-    Server* server = NULL;
-    Client* client = NULL;
-    NetworkThread* nt = NULL;
+    Server*& server = player.server;
+    Client*& client = player.client;
+    NetworkThread*& nt = player.nt;
     
-    Decoder decoder;
+    Decoder& decoder = player.decoder;
     
-    if(args.type == NT_SERVER)
-    {
-        server = new Server();
-        nt = server;
-        nt->start_thread();
-            
-        bool ok = decoder.open(args.video_path);
-        
-        if(!ok)
-            return EXIT_FAILURE;    
-        
-        decoder.add_fillable_frames(24*5);
-        decoder.start_thread();
-    }
-    else if(args.type == NT_CLIENT)
-    {
-        client = new Client(argv[2], 2345);
-        nt = client;
-        nt->start_thread();
-        
-        nt->send("HELLO");
-        
-        cout << "Waiting for path...\n";
-        
-        string path = "";
-        
-        while(path == "" || now == 0)
-        {
-            vector<Message> msgs;
-            client->get_messages(msgs);
-            
-            for(size_t i = 0; i < msgs.size(); i++)
-            {
-                Message& m = msgs[i];
-                
-                if(m.size() == 0)
-                    continue; // empty message
-                
-                try
-                {
-                    char type = m.read_char();
-                    
-                    switch(type)
-                    {
-                        case 'S':
-                            now = m.read_int64();
-                            start = av_gettime_relative() - now;
-                            break;
-                            
-                        case 'P':
-                            path = m.read_string();
-                            break;
-                    }
-                }
-                catch(ParseError pe)
-                {
-                    cerr << "Client start network parser error: " << pe.what() << '\n';
-                }   
-                
-//                if(m.bytes[0] == 'S')
-//                {
-//                    if(m.size() != sizeof(int64_t) + 1)
-//                    {
-//                        cerr << "Invalid network seek at client start!\n";
-//                        continue;
-//                    }
-//                    
-//                    char* out = (char*)&now;
-//                    char* in  = (char*)&m.bytes[1];
-//                    
-//                    for(size_t j = 0; j < sizeof(int64_t); j++)
-//                        *out++ = *in++;
-//                    
-//                    start = av_gettime_relative() - now;
-//                    
-//                    continue;
-//                }
-//                
-//                if(m.bytes[0] == 'P')
-//                {
-//                    path = m.as_string().c_str() + 1;
-//                    continue;
-//                }
-            }
-        }
-        
-        // explicitly passed path overrides network request
-        if(args.video_path.size() > 0)
-        {
-            cout << "Using explicit path override\n";
-            path = args.video_path;
-        }
-        else
-        {
-            cout << "Using network received path\n";
-        }
-            
-        bool ok = decoder.open(path);
-        
-        if(!ok)
-        {
-            cerr << "Can't open that path!\n";
-            cerr << "Path: " << path << '\n';
-            return EXIT_FAILURE;   
-        }
-        
-        decoder.add_fillable_frames(24*5);
-        decoder.start_thread();
-        
-        // now is set in microseconds (assuming AV_TIME_BASE = 1000000)
-        // decoder.time_base is a fraction (in seconds) per frame
-        // discrete ticks of it are times to seek to?
-        
-        int64_t seek_to = av_rescale(now, 
-            decoder.time_base.den, decoder.time_base.num);
-        
-        seek_to /= AV_TIME_BASE;
-        
-        decoder.seek(seek_to);
-        
-        cout << "SEEK TO: " << seek_to << '\n';
-    }
-    else
-    {
-        cerr << "You must specify --client or --server!\n";
-        exit(EXIT_FAILURE);
-    }
+    player.start_threads();
 
     // 10 seconds of buffer is ~750MB if video size is 1920x1080
     
@@ -634,9 +86,31 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
     
-    monitor_test();
+    //monitor_test();
+    int monitor_count = 0;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitor_count);
     
-    window = glfwCreateWindow(1920/2, 1080/2, "Video Sphere", NULL, NULL);
+    if(monitor_count == 0)
+    {
+        cerr << "Failed to detect monitors!\n";
+        return EXIT_FAILURE;
+    }
+    
+    if(client)
+    {
+        GLFWmonitor* monitor = monitors[0];
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        
+        //window = glfwCreateWindow(mode->width, mode->height, "Video Sphere", monitor, NULL);
+        window = glfwCreateWindow(1920/2, 1080/2, "Video Sphere", NULL, NULL);
+    }
+    else
+    {
+        // server
+        window = glfwCreateWindow(1920/2, 1080/2, "Video Sphere", NULL, NULL);
+    }
+    
+    
     if(!window)
     {
         glfwTerminate();
@@ -781,7 +255,7 @@ int main(int argc, char* argv[])
         else if(phi < -TURN/4)
             phi = -TURN/4;
         
-        if(send_pos && args.type == NT_SERVER)
+        if(send_pos && player.type == NT_SERVER)
         {
             Message turn;
             turn.write_byte('T');
@@ -820,7 +294,7 @@ int main(int argc, char* argv[])
                     Message seek;
                     
                     path.write_char('P');
-                    path.write_string(args.video_path);
+                    path.write_string(player.video_path);
                     
                     seek.write_char('S');
                     seek.write_int64(now);

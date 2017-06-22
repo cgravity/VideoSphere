@@ -4,7 +4,7 @@ SOURCES := $(wildcard src/*.cpp)
 HEADERS := $(wildcard include/*.h)
 OBJECTS := $(SOURCES:src/%.cpp=build/%.o)
 
-CXXFLAGS := -w
+CXXFLAGS := -w -g
 
 INCLUDE_FFMPEG := $(shell pkg-config --cflags \
     libavformat libavcodec libswscale)
