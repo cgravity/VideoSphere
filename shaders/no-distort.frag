@@ -1,6 +1,6 @@
-#version 430
+#version 120
 
-layout(binding=0) uniform sampler2D video_texture;
+uniform sampler2D video_texture;
 varying vec4 tex_coord;
 
 void main()

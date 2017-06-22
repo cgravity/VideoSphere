@@ -107,7 +107,7 @@ int main(int argc, char* argv[])
     else
     {
         // server
-        window = glfwCreateWindow(1920/2, 1080/2, "Video Sphere", NULL, NULL);
+        window = glfwCreateWindow(1920/2, 1920/2/2, "Video Sphere", NULL, NULL);
     }
     
     
@@ -134,7 +134,7 @@ int main(int argc, char* argv[])
     no_distort_files.push_back("shaders/no-distort.vert");
     no_distort_files.push_back("shaders/no-distort.frag");
     
-    //GLint no_distort_program = load_shaders(no_distort_files);
+    GLint no_distort_program = load_shaders(no_distort_files);
     
     
     vector<string> mono_equirect_files;
@@ -145,7 +145,12 @@ int main(int argc, char* argv[])
     
     
     // select which shader to use
-    GLint shader_program = mono_equirect_program;
+    GLint shader_program;
+    
+    if(server)
+        shader_program = no_distort_program;
+    else
+        shader_program = mono_equirect_program;
     
     GLint theta_ = glGetUniformLocation(shader_program, "theta");
     GLint phi_   = glGetUniformLocation(shader_program, "phi");
@@ -167,9 +172,6 @@ int main(int argc, char* argv[])
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // FIXME
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
-    
-    int i = 0;
     
     
     
@@ -409,15 +411,19 @@ int main(int argc, char* argv[])
         glBegin(GL_QUADS);
         {
             glVertexAttrib3f(pos, -11, 2*1.5, 6);
+            glTexCoord2f(0, 0);
             glVertex2f(-1, 1);
             
             glVertexAttrib3f(pos, -11, 2*1.5, -6);
+            glTexCoord2f(0, 1);
             glVertex2f(-1, -1);
 
             glVertexAttrib3f(pos, 11, 2*1.5, -6);
+            glTexCoord2f(1,1);
             glVertex2f(1,-1);
             
             glVertexAttrib3f(pos, 11, 2*1.5, 6);
+            glTexCoord2f(1, 0);
             glVertex2f(1,1);
         }
         glEnd();
