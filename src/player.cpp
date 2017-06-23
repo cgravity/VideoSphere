@@ -245,6 +245,8 @@ void Player::create_windows()
         
         if(sc.fullscreen && monitor)
         {
+            glfwWindowHint(GLFW_DECORATED, false);
+            
             const GLFWvidmode* mode = glfwGetVideoMode(monitor);
             glfwWindowHint(GLFW_RED_BITS, mode->redBits);
             glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
@@ -255,7 +257,7 @@ void Player::create_windows()
                 mode->width,
                 mode->height,
                 "Video Sphere",
-                monitor,
+                NULL, //monitor,
                 share_context);
         }
         else
@@ -264,7 +266,7 @@ void Player::create_windows()
                 sc.pixel_width,
                 sc.pixel_height,
                 "Video Sphere",
-                monitor,
+                NULL, //monitor,
                 share_context);
         }
         

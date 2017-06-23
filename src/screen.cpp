@@ -102,8 +102,9 @@ void parse_calvr_screen_config(vector<ScreenConfig>& screens_out,
         parse_float_attr(screen_node, screen.originZ, "originZ");
         
         // FIXME: Load pixel config from WindowConfig section!
-        screen.pixel_width = 1920;
-        screen.pixel_height = 1080;
+        screen.pixel_width = 1920/2;
+        screen.pixel_height = 1080/2;
+        screen.fullscreen = false; // FIXME: remove this
         
         screens_out.push_back(screen);
         screen_node = screen_node->next_sibling("Screen");

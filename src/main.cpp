@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
     }
     
     glfwMakeContextCurrent(player.windows[0]);
-    
+        
     // initialize GLEW
     GLenum glew_error = glewInit();
     if (GLEW_OK != glew_error)
@@ -148,17 +148,18 @@ int main(int argc, char* argv[])
     else
         shader_program = mono_equirect_program;
     
-    GLint theta_ = glGetUniformLocation(shader_program, "theta");
-    GLint phi_   = glGetUniformLocation(shader_program, "phi");
-    GLint pos = glGetAttribLocation(shader_program, "pos_in");
+    
     
     float theta = 0.0;
     float phi = 0.0;
     
-    glUseProgram(shader_program);
-    
-    
-    glEnable(GL_TEXTURE_2D);
+    for(size_t i = 0; i < player.windows.size(); i++)
+    {
+        glfwMakeContextCurrent(player.windows[i]);
+        glUseProgram(shader_program);
+        glEnable(GL_TEXTURE_2D);
+    }
+    glfwMakeContextCurrent(player.windows[0]);
     GLuint tex;
     glGenTextures(1, &tex);
     
@@ -168,7 +169,14 @@ int main(int argc, char* argv[])
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     
-    
+    for(size_t i = 0; i < player.windows.size(); i++)
+    {
+        glfwMakeContextCurrent(player.windows[i]);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        GLint video_texture_ = glGetUniformLocation(shader_program, "video_texture");
+        glUniform1i(video_texture_, 0);
+    }
     
     bool decoded_all = false;
     
@@ -393,6 +401,7 @@ int main(int argc, char* argv[])
         
         //printf("Frame end: %f, NOW: %f\n", current_frame_end, now_f);
         
+        glfwMakeContextCurrent(player.windows[0]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
             decoder.codec_context->width, decoder.codec_context->height,
             0, GL_RGB, GL_UNSIGNED_BYTE, show_frame->data[0]);
@@ -400,15 +409,18 @@ int main(int argc, char* argv[])
         decoder.return_frame(show_frame);
         
         
-        // for 'pos', using convention where x goes to the right, y goes in,
-        // and z goes up.
-        glUniform1f(theta_, theta);
-        glUniform1f(phi_, phi);
-        
-        
         for(size_t i = 0; i < player.windows.size(); i++)
         {
             glfwMakeContextCurrent(player.windows[i]);
+            
+            GLint theta_ = glGetUniformLocation(shader_program, "theta");
+            GLint phi_   = glGetUniformLocation(shader_program, "phi");
+            GLint pos = glGetAttribLocation(shader_program, "pos_in");
+            
+             // for 'pos', using convention where x goes to the right, y goes in,
+            // and z goes up.
+            glUniform1f(theta_, theta);
+            glUniform1f(phi_, phi);
             
             glBegin(GL_QUADS);
             {
