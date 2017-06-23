@@ -60,12 +60,13 @@ struct Decoder
         pthread_mutex_lock(&mutex);
         av_seek_frame(format_context, video_stream_index, 
             seek_to, AVSEEK_FLAG_ANY);
-        
-//        if(avformat_seek_file(format_context, video_stream_index, 0,
-//            seek_to, seek_to, 0) < 0)
-//        {
-//            std::cerr << "Seek failed\n";
-//        }
+
+        // flush visible frames
+        while(showable_frames.size())
+        {
+            fillable_frames.push_back(showable_frames.front());
+            showable_frames.pop_front();
+        }
         
         pthread_mutex_unlock(&mutex);
     }

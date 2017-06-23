@@ -246,6 +246,7 @@ void Player::create_windows()
         if(sc.fullscreen && monitor)
         {
             glfwWindowHint(GLFW_DECORATED, false);
+            glfwWindowHint(GLFW_AUTO_ICONIFY, false);
             
             const GLFWvidmode* mode = glfwGetVideoMode(monitor);
             glfwWindowHint(GLFW_RED_BITS, mode->redBits);
@@ -257,8 +258,13 @@ void Player::create_windows()
                 mode->width,
                 mode->height,
                 "Video Sphere",
-                NULL, //monitor,
+                monitor,
                 share_context);
+            
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+            
+            glfwMakeContextCurrent(window);
+            glViewport(0,0,mode->width,mode->height);
         }
         else
         {
@@ -266,9 +272,12 @@ void Player::create_windows()
                 sc.pixel_width,
                 sc.pixel_height,
                 "Video Sphere",
-                NULL, //monitor,
+                monitor,
                 share_context);
         }
+        
+        if(!window)
+            fatal("Failed to open window!");
         
         if(share_context == NULL)
             share_context = window;
