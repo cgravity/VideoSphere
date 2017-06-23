@@ -1,6 +1,9 @@
 #version 120
 
 uniform sampler2D video_texture;
+uniform float phi;
+uniform float theta;
+
 varying vec3 pos;
 
 const float TURN = 6.283185307179586;
@@ -22,8 +25,8 @@ void main()
 {
     vec2 latlong = vec3_to_latlong(normalize(pos));
     
-    float lat = latlong.x;
-    float lon = latlong.y;
+    float lat = latlong.x + phi;
+    float lon = mod(latlong.y + theta, TURN);
     
     float x = lon / TURN;
     float y = ((lat / (0.25*TURN) + 1.0)) / 2.0;

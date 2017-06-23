@@ -191,20 +191,23 @@ int main(int argc, char* argv[])
     
     GLFWwindow* window = player.windows[0];
     
-    while(true)
+    bool quit = false;
+    while(!quit)
     {
         glfwPollEvents();
         
         bool send_pos = false;
         
-        if(glfwGetKey(window, GLFW_KEY_ESCAPE))
-            break;
+      for(size_t i = player.windows.size()-1; i < player.windows.size(); i++)
+      {
+        if(glfwGetKey(player.windows[i], GLFW_KEY_ESCAPE))
+            quit = true;
         
-        if(glfwGetKey(window, GLFW_KEY_LEFT))
+        if(glfwGetKey(player.windows[i], GLFW_KEY_LEFT))
         {
             if(!left_down)
             {
-                theta -= TURN / 25;
+                theta += TURN / 25;
                 send_pos = true;
             }
             
@@ -213,11 +216,11 @@ int main(int argc, char* argv[])
         else
             left_down = false;
         
-        if(glfwGetKey(window, GLFW_KEY_RIGHT))
+        if(glfwGetKey(player.windows[i], GLFW_KEY_RIGHT))
         {
             if(!right_down)
             {
-                theta += TURN / 25;
+                theta -= TURN / 25;
                 send_pos = true;
             }
             
@@ -226,11 +229,11 @@ int main(int argc, char* argv[])
         else
             right_down = false;
         
-        if(glfwGetKey(window, GLFW_KEY_UP))
+        if(glfwGetKey(player.windows[i], GLFW_KEY_UP))
         {
             if(!up_down)
             {
-                phi -= (TURN/4) / 10.0;
+                phi += (TURN/4) / 10.0;
                 send_pos = true;
             }
             
@@ -239,11 +242,11 @@ int main(int argc, char* argv[])
         else
             up_down = false;
         
-        if(glfwGetKey(window, GLFW_KEY_DOWN))
+        if(glfwGetKey(player.windows[i], GLFW_KEY_DOWN))
         {
             if(!down_down)
             {
-                phi += (TURN/4) / 10.0;
+                phi -= (TURN/4) / 10.0;
                 send_pos = true;
             }
             
@@ -251,7 +254,8 @@ int main(int argc, char* argv[])
         }
         else
             down_down = false;
-        
+      } // end of for each window
+              
         theta = fmod(theta, TURN);
         if(theta < 0)
             theta += TURN;
@@ -261,6 +265,7 @@ int main(int argc, char* argv[])
             phi = TURN/4;
         else if(phi < -TURN/4)
             phi = -TURN/4;
+
         
         if(send_pos && player.type == NT_SERVER)
         {
