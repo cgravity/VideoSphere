@@ -417,25 +417,47 @@ int main(int argc, char* argv[])
             GLint phi_   = glGetUniformLocation(shader_program, "phi");
             GLint pos = glGetAttribLocation(shader_program, "pos_in");
             
-             // for 'pos', using convention where x goes to the right, y goes in,
+            GLint roll_    = glGetUniformLocation(shader_program, "roll");
+            GLint pitch_   = glGetUniformLocation(shader_program, "pitch");
+            GLint heading_ = glGetUniformLocation(shader_program, "heading");
+            GLint originX_ = glGetUniformLocation(shader_program, "originX");
+            GLint originY_ = glGetUniformLocation(shader_program, "originY");
+            GLint originZ_ = glGetUniformLocation(shader_program, "originZ");
+            GLint width_   = glGetUniformLocation(shader_program, "width");
+            GLint height_  = glGetUniformLocation(shader_program, "height");
+            
+            // for 'pos', using convention where x goes to the right, y goes in,
             // and z goes up.
             glUniform1f(theta_, theta);
             glUniform1f(phi_, phi);
             
+            glUniform1f(roll_, player.screen_config[i].roll);
+            glUniform1f(pitch_, player.screen_config[i].pitch);
+            glUniform1f(heading_, player.screen_config[i].height);
+            glUniform1f(originX_, player.screen_config[i].originX);
+            glUniform1f(originY_, player.screen_config[i].originY);
+            glUniform1f(originZ_, player.screen_config[i].originZ);
+            glUniform1f(width_, player.screen_config[i].width);
+            glUniform1f(height_, player.screen_config[i].height);
+            
             glBegin(GL_QUADS);
             {
+                // top left
                 glVertexAttrib3f(pos, -11, 2*1.5, 6);
-                glTexCoord2f(0, 0);
+                glTexCoord2f(0, 0); // only used by server
                 glVertex2f(-1, 1);
                 
+                // bottom left
                 glVertexAttrib3f(pos, -11, 2*1.5, -6);
                 glTexCoord2f(0, 1);
                 glVertex2f(-1, -1);
 
+                // bottom right
                 glVertexAttrib3f(pos, 11, 2*1.5, -6);
                 glTexCoord2f(1,1);
                 glVertex2f(1,-1);
                 
+                // top right
                 glVertexAttrib3f(pos, 11, 2*1.5, 6);
                 glTexCoord2f(1, 0);
                 glVertex2f(1,1);
