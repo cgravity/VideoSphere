@@ -7,6 +7,10 @@
 #include <vector>
 #include <string>
 
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
+
 enum NetworkType
 {
     NT_UNDEFINED,
@@ -33,7 +37,10 @@ struct Player
     int64_t now;
     
     // used by client to list screen properties
-    std::vector<Screen> screen_config; 
+    std::vector<ScreenConfig> screen_config; 
+    
+    // windows created based on screen_config, in same order
+    std::vector<GLFWwindow*> windows;
     
     // used by server or client to indicate video path
     // by default, clients will get this from server
@@ -62,6 +69,9 @@ struct Player
     // starts up the networking and decoder based on type.
     // assumes arguments are fully parsed first.
     void start_threads();
+    
+    // opens GLFW windows based on settings in screen_config
+    void create_windows();
 };
 
 void parse_args(Player& player, int argc, char** argv);

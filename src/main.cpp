@@ -38,13 +38,17 @@ using namespace std;
 // USE PortAudio pa_stable_v190600_20161030
 
 
-void on_window_resize(GLFWwindow* window, int w, int h)
-{
-    glViewport(0,0,w,h);
-}
+
 
 int main(int argc, char* argv[]) 
-{    
+{        
+    if(!glfwInit())
+    {
+        glfwTerminate();
+        cerr << "Failed to init GLFW3\n";
+        return EXIT_FAILURE;
+    }
+    
     Player player;
     
     av_register_all();
@@ -75,50 +79,42 @@ int main(int argc, char* argv[])
     
     player.start_threads();
 
-    // 10 seconds of buffer is ~750MB if video size is 1920x1080
     
-    GLFWwindow* window;
     
-    if(!glfwInit())
+//    if(client)
+//    {
+//        GLFWmonitor* monitor = monitors[0];
+//        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+//        
+//        //window = glfwCreateWindow(mode->width, mode->height, "Video Sphere", monitor, NULL);
+//        window = glfwCreateWindow(1920/2, 1080/2, "Video Sphere", NULL, NULL);
+//    }
+//    else
+//    {
+//        // server
+//        window = glfwCreateWindow(1920/2, 1920/2/2, "Video Sphere", NULL, NULL);
+//    }
+
+    if(server && player.screen_config.size() == 0)
     {
-        glfwTerminate();
-        cerr << "Failed to init GLFW3\n";
-        return EXIT_FAILURE;
-    }
-    
-    //monitor_test();
-    int monitor_count = 0;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitor_count);
-    
-    if(monitor_count == 0)
-    {
-        cerr << "Failed to detect monitors!\n";
-        return EXIT_FAILURE;
-    }
-    
-    if(client)
-    {
-        GLFWmonitor* monitor = monitors[0];
-        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        ScreenConfig sc;
+        sc.pixel_width = 960;
+        sc.pixel_height = 480;
+        sc.fullscreen = false;
         
-        //window = glfwCreateWindow(mode->width, mode->height, "Video Sphere", monitor, NULL);
-        window = glfwCreateWindow(1920/2, 1080/2, "Video Sphere", NULL, NULL);
-    }
-    else
-    {
-        // server
-        window = glfwCreateWindow(1920/2, 1920/2/2, "Video Sphere", NULL, NULL);
+        player.screen_config.push_back(sc);
     }
     
+    player.create_windows();
     
-    if(!window)
+    if(player.windows.size() == 0)
     {
         glfwTerminate();
         cerr << "Failed to open window\n";
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(player.windows[0]);
     
     // initialize GLEW
     GLenum glew_error = glewInit();
@@ -161,7 +157,6 @@ int main(int argc, char* argv[])
     
     glUseProgram(shader_program);
     
-    glfwSetWindowSizeCallback(window, on_window_resize);
     
     glEnable(GL_TEXTURE_2D);
     GLuint tex;
@@ -185,6 +180,8 @@ int main(int argc, char* argv[])
     bool right_down = false;
     bool up_down = false;
     bool down_down = false;
+    
+    GLFWwindow* window = player.windows[0];
     
     while(true)
     {
@@ -408,27 +405,33 @@ int main(int argc, char* argv[])
         glUniform1f(theta_, theta);
         glUniform1f(phi_, phi);
         
-        glBegin(GL_QUADS);
-        {
-            glVertexAttrib3f(pos, -11, 2*1.5, 6);
-            glTexCoord2f(0, 0);
-            glVertex2f(-1, 1);
-            
-            glVertexAttrib3f(pos, -11, 2*1.5, -6);
-            glTexCoord2f(0, 1);
-            glVertex2f(-1, -1);
-
-            glVertexAttrib3f(pos, 11, 2*1.5, -6);
-            glTexCoord2f(1,1);
-            glVertex2f(1,-1);
-            
-            glVertexAttrib3f(pos, 11, 2*1.5, 6);
-            glTexCoord2f(1, 0);
-            glVertex2f(1,1);
-        }
-        glEnd();
         
-        glfwSwapBuffers(window);
+        for(size_t i = 0; i < player.windows.size(); i++)
+        {
+            glfwMakeContextCurrent(player.windows[i]);
+            
+            glBegin(GL_QUADS);
+            {
+                glVertexAttrib3f(pos, -11, 2*1.5, 6);
+                glTexCoord2f(0, 0);
+                glVertex2f(-1, 1);
+                
+                glVertexAttrib3f(pos, -11, 2*1.5, -6);
+                glTexCoord2f(0, 1);
+                glVertex2f(-1, -1);
+
+                glVertexAttrib3f(pos, 11, 2*1.5, -6);
+                glTexCoord2f(1,1);
+                glVertex2f(1,-1);
+                
+                glVertexAttrib3f(pos, 11, 2*1.5, 6);
+                glTexCoord2f(1, 0);
+                glVertex2f(1,1);
+            }
+            glEnd();
+        
+            glfwSwapBuffers(player.windows[i]);
+        }
     }
     
 end_of_video:

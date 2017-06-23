@@ -76,7 +76,7 @@ void fatal(string why)
 // ---------------------------------------------------------------------------
 void test_screen_parse()
 {
-    vector<Screen> screens;
+    vector<ScreenConfig> screens;
     parse_calvr_screen_config(screens, "../../data/wave-full-screens.xml",
         "wave-2-2.local");
     

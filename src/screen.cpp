@@ -5,7 +5,7 @@
 #include <iostream>
 using namespace std;
 
-void Screen::debug_print() const
+void ScreenConfig::debug_print() const
 {
     cout << "Screen " << index << "\n"
          << "  width:   " << width << '\n'
@@ -44,7 +44,7 @@ void parse_int_attr(rapidxml::xml_node<>* screen_node, int& into, string attr_na
         fatal("Failed to parse '" + attr_name + "' in screen config");
 }
 
-void parse_calvr_screen_config(vector<Screen>& screens_out, 
+void parse_calvr_screen_config(vector<ScreenConfig>& screens_out, 
     string filename, string host)
 {
     using namespace rapidxml;
@@ -86,7 +86,7 @@ void parse_calvr_screen_config(vector<Screen>& screens_out,
     
     while(screen_node)
     {
-        Screen screen;
+        ScreenConfig screen;
         
         parse_int_attr(screen_node, screen.index, "screen");
         
@@ -100,6 +100,10 @@ void parse_calvr_screen_config(vector<Screen>& screens_out,
         parse_float_attr(screen_node, screen.originX, "originX");
         parse_float_attr(screen_node, screen.originY, "originY");
         parse_float_attr(screen_node, screen.originZ, "originZ");
+        
+        // FIXME: Load pixel config from WindowConfig section!
+        screen.pixel_width = 1920;
+        screen.pixel_height = 1080;
         
         screens_out.push_back(screen);
         screen_node = screen_node->next_sibling("Screen");

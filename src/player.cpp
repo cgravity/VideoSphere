@@ -210,3 +210,69 @@ void parse_args(Player& player, int argc, char* argv[])
     }
 }
 
+void on_window_resize(GLFWwindow* window, int w, int h)
+{
+    glViewport(0,0,w,h);
+}
+
+void Player::create_windows()
+{
+    int monitor_count = 0;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitor_count);
+    
+    if(monitor_count == 0)
+    {
+        cerr << "Failed to detect monitors!\n";
+        exit(EXIT_FAILURE);
+    }
+    
+    GLFWwindow* share_context = NULL;
+    
+    for(size_t i = 0; i < screen_config.size(); i++)
+    {
+        ScreenConfig& sc = screen_config[i];
+        
+        GLFWmonitor* monitor = NULL;
+        GLFWwindow* window = NULL;
+        
+        if(sc.index >= 0)
+        {
+            if(sc.index < monitor_count)
+                monitor = monitors[sc.index];
+            else
+                fatal("Monitor out of range");
+        }
+        
+        if(sc.fullscreen && monitor)
+        {
+            const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+            glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+            glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+            glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+            glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+            
+            window = glfwCreateWindow(
+                mode->width,
+                mode->height,
+                "Video Sphere",
+                monitor,
+                share_context);
+        }
+        else
+        {
+            window = glfwCreateWindow(
+                sc.pixel_width,
+                sc.pixel_height,
+                "Video Sphere",
+                monitor,
+                share_context);
+        }
+        
+        if(share_context == NULL)
+            share_context = window;
+        
+        glfwSetWindowSizeCallback(window, on_window_resize);
+        windows.push_back(window);
+    }
+}
+
