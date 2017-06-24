@@ -57,6 +57,8 @@ struct Player
     // used by clients to indicate name in CalVR config
     std::string hostname;       
     
+    int monitor;
+    
     Player()
     {
         type = NT_UNDEFINED;
@@ -64,6 +66,8 @@ struct Player
         server = NULL;
         client = NULL;
         nt = NULL;
+        
+        monitor = -1; // indicates create a window on all monitors listed
     }
     
     // starts up the networking and decoder based on type.

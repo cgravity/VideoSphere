@@ -21,6 +21,8 @@
 #include <list>
 #include <stdexcept>
 
+#define VIDEO_SPHERE_PORT 4545
+
 struct Connection;
 
 enum IncomingMsgState
@@ -442,7 +444,7 @@ class Server : public NetworkThread
     unsigned short port;
     
   public:
-    Server(unsigned short port = 2345) : NetworkThread(), port(port) {}
+    Server(unsigned short port = VIDEO_SPHERE_PORT) : NetworkThread(), port(port) {}
     
     virtual void send(const std::vector<unsigned char>& data)
     {

@@ -68,7 +68,7 @@ void Server::loop()
     while(true)
     {
         pthread_mutex_lock(&mutex);
-        bool quit = quit;
+        bool quit = quit_flag;
         pthread_mutex_unlock(&mutex);
         
         if(quit)
@@ -188,7 +188,7 @@ void Client::start_thread()
     memset(&sa, 0, sizeof(sa));
     
     sa.sin_family = AF_INET;
-    sa.sin_port = htons(2345);
+    sa.sin_port = htons(VIDEO_SPHERE_PORT);
     //int res = inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
     memcpy(&sa.sin_addr, he->h_addr_list[0], he->h_length);
     

@@ -25,7 +25,7 @@ void Player::start_threads()
     }
     else if(type == NT_CLIENT)
     {
-        client = new Client(server_address, 2345);
+        client = new Client(server_address, VIDEO_SPHERE_PORT);
         nt = client;
         nt->start_thread();
         
@@ -124,6 +124,10 @@ void parse_args(Player& player, int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     
+    cerr << "DEBUG arguments\n";
+    for(int i = 0; i < argc; i++)
+        cerr << "ARG " << i << " : " << argv[i] << '\n';
+    
     for(int i = 0; i < argc; i++)
     {
         if(argv[i] == string("--server"))
@@ -170,6 +174,18 @@ void parse_args(Player& player, int argc, char* argv[])
                 fatal("expected explicit hostname after --host");
             
             player.hostname = argv[i];
+            continue;
+        }
+        
+        if(argv[i] == string("--monitor"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected explicit monitor index after --monitor");
+            
+            bool ok = parse_int(player.monitor, argv[i]);
+            if(!ok)
+                fatal("Failed to parse monitor index!");
             continue;
         }
     }
@@ -227,6 +243,18 @@ void Player::create_windows()
     }
     
     GLFWwindow* share_context = NULL;
+    
+    // workaround for starting over SSH on WAVE
+    if(this->monitor >= 0)
+    {
+        if(this->monitor > screen_config.size())
+            fatal("Requested monitor out of range");
+        
+        ScreenConfig sc = screen_config[this->monitor];
+        sc.index = 0;
+        screen_config.clear();
+        screen_config.push_back(sc);
+    }
     
     for(size_t i = 0; i < screen_config.size(); i++)
     {

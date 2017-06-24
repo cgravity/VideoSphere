@@ -1,3 +1,5 @@
 video_sphere
 build/*
 *.ppm
+local.mk
+config.txt

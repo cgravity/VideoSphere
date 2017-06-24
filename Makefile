@@ -4,23 +4,25 @@ SOURCES := $(wildcard src/*.cpp)
 HEADERS := $(wildcard include/*.h)
 OBJECTS := $(SOURCES:src/%.cpp=build/%.o)
 
-CXXFLAGS := -w -g
+CXXFLAGS := -w -g -D__STDC_CONSTANT_MACROS
 
-INCLUDE_FFMPEG := $(shell pkg-config --cflags \
+-include local.mk
+
+INCLUDE_FFMPEG ?= $(shell pkg-config --cflags \
     libavformat libavcodec libswscale)
 
-LINK_FFMPEG := $(shell pkg-config --libs \
+LINK_FFMPEG ?= $(shell pkg-config --libs \
     libavformat libavcodec libswscale)
 
-INCLUDE_GLFW3 := $(shell pkg-config --cflags \
+INCLUDE_GLFW3 ?= $(shell pkg-config --cflags \
     glfw3)
 
-LINK_GLFW3 := $(shell pkg-config --libs --static \
+LINK_GLFW3 ?= $(shell pkg-config --libs --static \
 	glfw3) -lGL
 
-INCLUDE_GLEW :=  $(shell pkg-config --cflags glew)
+INCLUDE_GLEW ?=  $(shell pkg-config --cflags glew)
 
-LINK_GLEW := $(shell pkg-config --libs glew)
+LINK_GLEW ?= $(shell pkg-config --libs glew)
 
 video_sphere : $(OBJECTS) Makefile
 	@echo "Linking: $@"
