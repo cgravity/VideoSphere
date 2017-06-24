@@ -31,6 +31,17 @@ void main()
     float x = lon / TURN;
     float y = ((lat / (0.25*TURN) + 1.0)) / 2.0;
     
-    gl_FragColor = texture2D(video_texture, vec2(1-x,1-y));
+    if(y > 1)
+    {
+        gl_FragColor = vec4(1,0,0,1);
+    }
+    else if(y < 0)
+    {
+        gl_FragColor = vec4(0,0,1,1);
+    }
+    else
+    {
+        gl_FragColor = texture2D(video_texture, vec2(1-x,1-y));
+    }
 }
 
