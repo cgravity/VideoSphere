@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 using namespace std;
 
 #include <GLFW/glfw3.h>
@@ -139,4 +140,26 @@ void SaveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
   fclose(pFile);
 }
 
+string print_timestamp(int64_t time)
+{
+    time /= AV_TIME_BASE;
+
+    int64_t t_secs  = time;
+    int64_t t_mins  = t_secs / 60.0;
+    int64_t t_hours = t_mins / 60.0;
+    
+    t_secs %= 60;
+    t_mins %= 60;
+    
+    stringstream ss;
+    ss << std::setfill('0');
+    
+    if(abs(t_hours) > 0)
+        ss << std::setw(2) << t_hours << ":";
+    
+    ss << std::setw(2) << t_mins << ":";
+    ss << std::setw(2) << t_secs;
+    
+    return ss.str();
+}
 

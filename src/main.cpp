@@ -58,6 +58,7 @@ int main(int argc, char* argv[])
     
     int64_t& start = player.start;
     int64_t& now = player.now;
+    bool& seek_flag = player.seek_flag;
     
     start = av_gettime_relative();
     now = 0;
@@ -80,22 +81,6 @@ int main(int argc, char* argv[])
     Decoder& decoder = player.decoder;
     
     player.start_threads();
-
-    
-    
-//    if(client)
-//    {
-//        GLFWmonitor* monitor = monitors[0];
-//        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-//        
-//        //window = glfwCreateWindow(mode->width, mode->height, "Video Sphere", monitor, NULL);
-//        window = glfwCreateWindow(1920/2, 1080/2, "Video Sphere", NULL, NULL);
-//    }
-//    else
-//    {
-//        // server
-//        window = glfwCreateWindow(1920/2, 1920/2/2, "Video Sphere", NULL, NULL);
-//    }
 
     if(server && player.screen_config.size() == 0)
     {
@@ -191,6 +176,8 @@ int main(int argc, char* argv[])
     bool up_down = false;
     bool down_down = false;
     
+    bool space_down = false;
+    
     GLFWwindow* window = player.windows[0];
     
     bool quit = false;
@@ -199,9 +186,23 @@ int main(int argc, char* argv[])
         glfwPollEvents();
         
         bool send_pos = false;
-        
+      
       for(size_t i = player.windows.size()-1; i < player.windows.size(); i++)
       {
+        if(glfwGetKey(player.windows[i], GLFW_KEY_SPACE))
+        {
+            if(!space_down)
+            {
+                cout << "!!! NOW: " 
+                     << print_timestamp(now) << '\n';
+            }
+             
+            space_down = true;
+        }
+        else
+            space_down = false;
+      
+        
         if(glfwGetKey(player.windows[i], GLFW_KEY_ESCAPE))
             quit = true;
         
@@ -209,8 +210,20 @@ int main(int argc, char* argv[])
         {
             if(!left_down)
             {
-                theta += TURN / 25;
-                send_pos = true;
+                if(glfwGetKey(player.windows[i], 
+                    GLFW_KEY_LEFT_SHIFT) || 
+                   glfwGetKey(player.windows[i],
+                    GLFW_KEY_LEFT_CONTROL))
+                {
+                    // go back 10 seconds
+                    int64_t target = now - 10*AV_TIME_BASE;
+                    player.seek(target);
+                }
+                else
+                {
+                    theta += TURN / 25;
+                    send_pos = true;
+                }
             }
             
             left_down = true;
@@ -222,8 +235,22 @@ int main(int argc, char* argv[])
         {
             if(!right_down)
             {
-                theta -= TURN / 25;
-                send_pos = true;
+                
+                if(glfwGetKey(player.windows[i], 
+                    GLFW_KEY_LEFT_SHIFT) || 
+                   glfwGetKey(player.windows[i],
+                    GLFW_KEY_LEFT_CONTROL))
+                {
+                    // go forward 10 seconds
+                    int64_t target = now + 10 * AV_TIME_BASE;
+                    cout << "RAW SEEK RIGHT: " << target << '\n';
+                    player.seek(target);
+                }
+                else
+                {
+                    theta -= TURN / 25;
+                    send_pos = true;
+                }
             }
             
             right_down = true;
@@ -340,7 +367,8 @@ int main(int argc, char* argv[])
                     case 'S':
                     {
                         int64_t value = m.read_int64();
-                        decoder.seek(value);
+                        //decoder.seek(value);
+                        player.seek(value);
                     }
                     break;
                     
@@ -364,46 +392,80 @@ int main(int argc, char* argv[])
             }
         } // for each message
         
-        AVFrame* show_frame = NULL;
-        AVFrame* show_frame_prev = NULL;
+        DecoderFrame show_frame;
+        DecoderFrame show_frame_prev;
         
-        while(now_f > current_frame_end)
+//        if(seek_flag)
+//        {
+//            cout << "Seek flag!\n";
+//            seek_flag = false;
+//            
+//            if(show_frame.frame)
+//                decoder.return_frame(show_frame);
+//                
+//            if(show_frame_prev.frame)
+//                decoder.return_frame(show_frame_prev);
+//            
+//            show_frame = show_frame_prev = NULL;
+//            current_frame_end = 0;
+//        }
+        
+        while(seek_flag || now_f > current_frame_end)
         {
             show_frame_prev = show_frame;
             show_frame = decoder.get_frame();
             
-            if(show_frame && show_frame_prev)
+            // adjust time if we're seeking and got a seek frame
+            if(show_frame.frame && show_frame.seek_result)
             {
-                decoder.return_frame(show_frame_prev);
-                show_frame_prev = NULL;
+                int64_t new_now = av_rescale(
+                    show_frame.frame->pts,
+                    decoder.time_base.num,
+                    decoder.time_base.den);
+                
+                new_now *= AV_TIME_BASE;
+                start = av_gettime_relative() - new_now;
+                now = new_now;
+                
+                seek_flag = false;
             }
             
-            if(!show_frame && decoded_all)
+            if(show_frame.frame && show_frame_prev.frame)
+            {
+                decoder.return_frame(show_frame_prev);
+                show_frame_prev.frame = NULL;
+            }
+            
+            if(!show_frame.frame && decoded_all)
                 goto end_of_video; // end of video
             
-            if(!show_frame)
+            if(!show_frame.frame)
             {
                 //cerr << "Playing faster than decode\n";
                 break;
             }
             
-            current_frame_end = show_frame->pts;
+            current_frame_end = show_frame.frame->pts;
             current_frame_end /= decoder.time_base.den;
             current_frame_end *= decoder.time_base.num;
+            
+//            cout << "frame end: " << current_frame_end << '\n';
+//            cout << "now_f:     " << now_f << '\n';
         }
         
-        if(!show_frame && !show_frame_prev)
+        if(!show_frame.frame && !show_frame_prev.frame)
         {
             // no new frames ready
             continue;
         }
         
-        if(!show_frame && show_frame_prev)
+        if(!show_frame.frame && show_frame_prev.frame)
         {
             // lagged frame is ready, but current data not available
             // show it anyway as current frame (better late than nothing)
-            show_frame = show_frame_prev;
-            show_frame_prev = NULL;
+            //cout << "lagged\n";
+            show_frame.frame = show_frame_prev.frame;
+            show_frame_prev.frame = NULL;
         }
         
         //printf("Frame end: %f, NOW: %f\n", current_frame_end, now_f);
@@ -411,7 +473,7 @@ int main(int argc, char* argv[])
         glfwMakeContextCurrent(player.windows[0]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
             decoder.codec_context->width, decoder.codec_context->height,
-            0, GL_RGB, GL_UNSIGNED_BYTE, show_frame->data[0]);
+            0, GL_RGB, GL_UNSIGNED_BYTE, show_frame.frame->data[0]);
         
         decoder.return_frame(show_frame);
         

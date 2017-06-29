@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <stdint.h>
 
 std::string slurp(const std::string& filename);
 bool endswith(const std::string& data, const std::string& pattern);
@@ -9,6 +10,7 @@ bool parse_int(int& into, char* from);
 
 void fatal(std::string why);
 
+std::string print_timestamp(int64_t time);
 
 // ----------------------------------------------------------------------------
 void test_screen_parse();

@@ -4,7 +4,7 @@ SOURCES := $(wildcard src/*.cpp)
 HEADERS := $(wildcard include/*.h)
 OBJECTS := $(SOURCES:src/%.cpp=build/%.o)
 
-CXXFLAGS := -w -g -D__STDC_CONSTANT_MACROS
+CXXFLAGS := -w -g -D__STDC_CONSTANT_MACROS -O3
 
 -include local.mk
 

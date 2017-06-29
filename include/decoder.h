@@ -13,6 +13,14 @@ extern "C" {
 
 #include <iostream>
 
+struct DecoderFrame
+{
+    AVFrame* frame;
+    bool seek_result;
+    
+    DecoderFrame() : frame(NULL), seek_result(false) {}
+};
+
 struct Decoder
 {
     pthread_mutex_t mutex;     // lock for exclusive access to rest of struct
@@ -22,19 +30,26 @@ struct Decoder
 
     bool exit_flag;
     bool decoded_all_flag;
-    std::list<AVFrame*> showable_frames;
+    std::list<DecoderFrame> showable_frames;
     std::list<AVFrame*> fillable_frames;
     
     AVFormatContext* format_context;
     AVCodecContext*  codec_context;
     AVCodec*         codec;
-    
+ 
+    // time_base:    
+    // N / D = seconds per frame
+    // D / N = frames per second
+ 
     AVRational time_base;
     int64_t duration; // of the whole stream in time_base units
     int64_t number_of_frames; // in the whole stream, or 0 if unknown
     
     int video_stream_index;
     int audio_stream_index; // FIXME: unused
+    
+    bool flush_flag; // set by seek to tell decoder thread to flush old data
+    int64_t seek_to;
     
     Decoder()
     {
@@ -50,21 +65,28 @@ struct Decoder
         
         video_stream_index = -1;
         audio_stream_index = -1;
+        
+        flush_flag = false;
     }
     
     // opens a video file, returning true if successful
     bool open(const std::string& file_path);
     
+    // seek to frame
     void seek(int64_t seek_to)
     {
         pthread_mutex_lock(&mutex);
+        
         av_seek_frame(format_context, video_stream_index, 
-            seek_to, AVSEEK_FLAG_ANY);
-
+            seek_to, AVSEEK_FLAG_BACKWARD);
+        
+        flush_flag = true;
+        this->seek_to = seek_to;
+        
         // flush visible frames
         while(showable_frames.size())
         {
-            fillable_frames.push_back(showable_frames.front());
+            fillable_frames.push_back(showable_frames.front().frame);
             showable_frames.pop_front();
         }
         
@@ -107,9 +129,9 @@ struct Decoder
     
     // gets the next frame available from the decoder
     // returns NULL if no frame is available (e.g. end of video, slow decode...)
-    AVFrame* get_frame()
+    DecoderFrame get_frame()
     {
-        AVFrame* result = NULL;
+        DecoderFrame result;
         
         lock();
         
@@ -130,6 +152,13 @@ struct Decoder
     {
         lock();
         fillable_frames.push_back(frame);
+        unlock();
+    }
+    
+    void return_frame(DecoderFrame df)
+    {
+        lock();
+        fillable_frames.push_back(df.frame);
         unlock();
     }
     
@@ -157,7 +186,6 @@ struct Decoder
     // do not call this directly; it will be run indirectly by start_thread()
     void loop();
     
-    // FIXME: Add support for seeking
     // FIXME: Add support for audio
 };
 

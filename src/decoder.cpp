@@ -71,7 +71,10 @@ bool Decoder::open(const std::string& path)
     avcodec_parameters_to_context(codec_context,
         format_context->streams[video_stream_index]->codecpar);
     
-    if(avcodec_open2(codec_context, codec, NULL) < 0)
+    AVDictionary* opts = NULL;
+    av_dict_set(&opts, "recounted_frames", "1", 0);
+    
+    if(avcodec_open2(codec_context, codec, &opts) < 0)
     {
         cerr << "Couldn't open codec\n";
         return false;
@@ -149,6 +152,7 @@ continue_point:         // loop start
         pthread_exit(NULL);
     }
     
+    DecoderFrame show_frame;
     rgb_frame = NULL;
     
     if(fillable_frames.size())
@@ -172,7 +176,24 @@ continue_point:         // loop start
     }
     else
     {
+        if(flush_flag)
+        {
+            flush_flag = false;        
+            avcodec_flush_buffers(codec_context);
+            
+            while(showable_frames.size())
+            {
+                fillable_frames.push_back(showable_frames.front().frame);
+                showable_frames.pop_front();
+            }
+            
+            // next frame decoded may have weird timestamp because of seeking
+            // so, playback thread should adjust time when it sees this frame!
+            show_frame.seek_result = true;
+        }
+        
         unlock();   // don't need to hold lock while spending time decoding
+        
         
         while(av_read_frame(format_context, &packet) >= 0)
         {
@@ -214,7 +235,13 @@ continue_point:         // loop start
         
 finished_frame:
         lock(); // finished decoding a frame, so store it...
-        showable_frames.push_back(rgb_frame);
+        show_frame.frame = rgb_frame;
+        showable_frames.push_back(show_frame);
+
+        // clear for next result
+        show_frame.seek_result = false;
+        show_frame.frame = NULL;
+        
         goto continue_point;
     }
     

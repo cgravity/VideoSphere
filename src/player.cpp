@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 #include <cstdlib>
+#include <sstream>
+#include <iomanip>
 using namespace std;
 
 void Player::start_threads()
@@ -313,5 +315,120 @@ void Player::create_windows()
         glfwSetWindowSizeCallback(window, on_window_resize);
         windows.push_back(window);
     }
+}
+
+string describe_seek(int64_t target, int64_t duration, AVRational time_base)
+{
+    target /= AV_TIME_BASE;
+    duration = av_rescale(duration, time_base.num, time_base.den);
+    
+    int64_t t_secs  = target;
+    int64_t t_mins  = t_secs / 60.0;
+    int64_t t_hours = t_mins / 60.0;
+    
+    t_secs %= 60;
+    t_mins %= 60;
+    
+    int64_t d_secs  = duration;
+    int64_t d_mins  = d_secs / 60.0;
+    int64_t d_hours = d_mins / 60.0;
+    
+    d_secs %= 60;
+    d_mins %= 60;
+    
+    stringstream ss;
+    ss << std::setfill('0');
+    
+    // note: use d_hours here since we want to show if the duration
+    // stretches into hours regardless of whether the current target time
+    // is over or under an hour.
+    if(abs(d_hours) > 0)
+        ss << std::setw(2) << t_hours << ":";
+    
+    ss << std::setw(2) << t_mins << ":";
+    ss << std::setw(2) << t_secs << " / ";
+
+    if(abs(d_hours) > 0)
+        ss << std::setw(2) << d_hours << ":";
+    
+    ss << std::setw(2) << d_mins << ":";
+    ss << std::setw(2) << d_secs;
+    
+    return ss.str();
+}
+
+void Player::seek(int64_t target)
+{
+    /*
+     *  == Explanation of time ==
+     *
+     *  now
+     *      how far (in microseconds) that the current playback of the
+     *      video has advanced.
+     *
+     *  start
+     *      Value returned by av_gettime_relative() when playback started.
+     *      now is calculated from it as: now = av_gettime_relative() - start.
+     *
+     *  av_seek_frame(...)
+     *      requires timestamp in AVStream.time_base units
+     *
+     *  AVStream.time_base 
+     *      Gives a fraction of a second (e.g. 1/30000) used to timestamp frames
+     *      Timestamps are given as an integer multiple of this base unit. 
+     *      It's done this way to avoid floating point math and all the 
+     *      weirdness that would come with tracking timestamps like that.
+     *      Unfortunately, it's not just a simple unit like microseconds 
+     *      and probably varies from file to file.
+     *
+     *  AV_TIME_BASE
+     *      The "internal timebase", which is set to the number of 
+     *      microseconds in a second (i.e. 1000000) in the version of FFMPEG
+     *      used here.
+     */
+
+    if(target < 0)
+        target = 0;
+    
+    // find duration time in microseconds
+    // note that time in decoder is in terms of the decoder time_base scale.
+    // multiplying by the decoder scale gives time in seconds; to get
+    // microseconds from seconds, we multiply by AV_TIME_BASE.
+    int64_t duration_usecs = decoder.duration;
+    duration_usecs = av_rescale(duration_usecs, 
+        decoder.time_base.num, decoder.time_base.den);
+    duration_usecs *= AV_TIME_BASE;
+    
+    if(target > duration_usecs)
+        target = duration_usecs;
+    
+    if(server)
+    {        
+        Message seek;
+        seek.write_char('S');
+        seek.write_int64(target);
+        
+        server->send(seek);
+        
+        string time_description = describe_seek(
+            target, decoder.duration, decoder.time_base);
+        cout << "Seek to: " << time_description << "\n";
+    }
+    
+    start = av_gettime_relative() - target;
+    now = target;
+    
+    seek_flag = true;
+    
+    // now / AV_TIME_BASE = time to seek to, in seconds
+    // time_base^-1 = frame-time-base ticks per second
+    // so:
+    //  now / AV_TIME_BASE * time_base^-1 = time to seek to in frame time base.
+    // Note that the multiplication order below is shifted, but equivalent.
+    int64_t seek_to = av_rescale(now, 
+            decoder.time_base.den, decoder.time_base.num);    
+    seek_to /= AV_TIME_BASE;
+    decoder.seek(seek_to);
+    
 }
 
