@@ -31,14 +31,12 @@ using namespace std;
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include "ps3_joystick.h"
 
 #define TURN (2*3.1415926535)
 
 // USE FFMPEG 3.3.1
 // USE PortAudio pa_stable_v190600_20161030
-
-
-
 
 int main(int argc, char* argv[]) 
 {        
@@ -182,12 +180,77 @@ int main(int argc, char* argv[])
     
     GLFWwindow* window = player.windows[0];
     
+    JS_State js_prev, js_curr, js_new;
+    PS3Joystick joystick;
+    
+    if(server)
+        joystick.start();
+    
     bool quit = false;
+    
+    int64_t last_frame_start = av_gettime_relative();
+    int64_t current_frame_start = av_gettime_relative();
     while(!quit)
     {
-        glfwPollEvents();
+        last_frame_start = current_frame_start;
+        current_frame_start = av_gettime_relative();
+        
+        double dt = current_frame_start - last_frame_start;
+        dt /= AV_TIME_BASE;
         
         bool send_pos = false;
+        
+        glfwPollEvents();
+        
+        if(server)
+        {
+            joystick.update(js_new);
+            
+            if(js_new.valid)
+            {
+                js_prev.swap(js_curr);
+                js_curr.swap(js_new);
+                
+                
+                // after all swaps, new state mapped as:
+                //
+                //  curr -> prev
+                //  prev -> new
+                //  new  -> curr
+                //
+                // i.e. curr holds new current state, prev holds new prev state
+                // (old curr state) and new is a buffer than can be 
+                // overwritten (old prev state).
+                
+                if(js_curr.button_arrow_right && !js_prev.button_arrow_right)
+                {
+                    int64_t target = now + 10*AV_TIME_BASE;
+                    player.seek(target);
+                }
+                
+                if(js_curr.button_arrow_left && !js_prev.button_arrow_left)
+                {
+                    int64_t target = now - 10*AV_TIME_BASE;
+                    player.seek(target);
+                }
+                
+                // this debug tool helps to discover button numbers
+//                if(js_prev.valid && js_curr.valid)
+//                    for(size_t i = 0; i < js_curr.buttons.size(); i++)
+//                    {
+//                        if(js_curr.buttons[i] && !js_prev.buttons[i])
+//                            cout << "Button " << i << " pressed\n";
+//                    }
+            }
+         
+            send_pos = true;
+             
+            if(js_curr.valid)
+            {
+                theta += dt * js_curr.right_stick_x * TURN/3.0;
+                phi   -= dt * js_curr.right_stick_y * (TURN/4.0) / 2.0;
+            }
+        }
       
       for(size_t i = player.windows.size()-1; i < player.windows.size(); i++)
       {
@@ -389,6 +452,7 @@ int main(int argc, char* argv[])
                     {
                         phi = m.read_float();
                         theta = m.read_float();
+                        cout << "T";
                     }
                     break;
                     
@@ -565,6 +629,10 @@ end_of_video:
     cout << "end of video detected\n";
     decoder.set_quit();
     decoder.join();
+    
+    if(server)
+        joystick.shutdown();
+    
     glfwTerminate();
 }
 

@@ -24,15 +24,25 @@ INCLUDE_GLEW ?=  $(shell pkg-config --cflags glew)
 
 LINK_GLEW ?= $(shell pkg-config --libs glew)
 
-video_sphere : $(OBJECTS) Makefile
+video_sphere : build/oscpack_1_1_0/liboscpack.so.1.1.0 $(OBJECTS) Makefile
 	@echo "Linking: $@"
-	@g++ -o $@ $(OBJECTS) $(LINK_FFMPEG) $(LINK_GLFW3) $(LINK_GLEW)
+	@g++ -o $@ $(OBJECTS) $(LINK_FFMPEG) $(LINK_GLFW3) $(LINK_GLEW) -Lbuild/oscpack_1_1_0 -loscpack -Wl,-rpath=build/oscpack_1_1_0
 
 build/%.o : src/%.cpp $(HEADERS) Makefile
 	@echo "Compiling C++: $<"
 	@mkdir -p ./build
-	@g++ -Iinclude -o $@ $(CXXFLAGS) -c $< $(INCLUDE_FFMPEG) $(INCLUDE_GLFW3) \
+	@g++ -Iinclude -Ibuild -o $@ $(CXXFLAGS) -c $< $(INCLUDE_FFMPEG) $(INCLUDE_GLFW3) \
 	    $(INCLUDE_GLEW)
+
+build/oscpack_1_1_0/liboscpack.so.1.1.0 : oscpack_1_1_0.zip
+	@echo "Building OSCPack 1.1.0..."
+	@unzip oscpack_1_1_0.zip -d build/
+	@cd build/oscpack_1_1_0/ && make clean
+	@cd build/oscpack_1_1_0/ &&  sed -i 's/ENDIANESS=OSC_DETECT_ENDIANESS/ENDIANESS=OSC_HOST_LITTLE_ENDIAN/' Makefile
+	@cd build/oscpack_1_1_0/ && sed -i 's/CXXFLAGS :=/CXXFLAGS := -fPIC/' Makefile
+	@cd build/oscpack_1_1_0 && make lib
+	@cd build/oscpack_1_1_0 && ln -s liboscpack.so.1.1.0 liboscpack.so
+
 
 clean:
 	@rm -rf build
