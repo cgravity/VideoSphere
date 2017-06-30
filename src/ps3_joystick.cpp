@@ -46,6 +46,7 @@ struct PS3_NetworkThread : public osc::OscPacketListener
         IpEndpointName( IpEndpointName::ANY_ADDRESS, PORT ),
         this)
     {
+        mutex = PTHREAD_MUTEX_INITIALIZER;
     }
     
     void get_state(JS_State& into)
