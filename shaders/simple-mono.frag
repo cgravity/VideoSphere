@@ -25,8 +25,11 @@ void main()
 {
     vec2 latlong = vec3_to_latlong(normalize(pos));
     
-    float lat = latlong.x + phi;
-    float lon = mod(latlong.y + theta, TURN);
+//    float lat = latlong.x + phi;
+//    float lon = mod(latlong.y + theta, TURN);
+
+    float lat = latlong.x;
+    float lon = mod(latlong.y, TURN);
     
     float x = lon / TURN;
     float y = ((lat / (0.25*TURN) + 1.0)) / 2.0;

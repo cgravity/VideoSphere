@@ -1,7 +1,7 @@
 #version 120
 
-//uniform float theta; // shift longitude
-//uniform float phi;   // shift latitude
+uniform float theta; // shift longitude
+uniform float phi;   // shift latitude
 
 // per screen
 uniform float roll;
@@ -71,12 +71,16 @@ void main()
     mat4 rot_p = rotationMatrix(vec3(1,0,0), deg2rad(pitch));
     mat4 rot_h = rotationMatrix(vec3(0,0,1), deg2rad(heading));
     
+    mat4 rot_theta = rotationMatrix(vec3(0,0,1), theta);
+    mat4 rot_phi = rotationMatrix(vec3(1,0,0), phi);
+
+    
     // FIXME: something wrong with rotationMatrix -- rot_h and rot_r
     // don't give identity as they should on WAVE! Note, had to change
     // to -sin() as suggested in comments. This may be fine for now on WAVE
     // as it only uses pitch, but other systems need the full rph setting...
     mat4 rot_rph = rot_h * rot_p * rot_r;
-    rot_rph = rot_p;
+    //rot_rph = rot_p;
     
     vec4 facing = vec4(originX, originY, originZ, 1);
     vec4 up = vec4(0,0,1,1);
@@ -85,6 +89,7 @@ void main()
     vec4 co4 = vec4(corner_offset3, 1);
     co4 = rot_rph * co4;
     co4 += vec4(center3,0);
+    co4 = rot_theta * rot_phi * co4;
     pos = co4.xyz;
     
     //vec4 co4 = vec4(corner_offset3, 1);

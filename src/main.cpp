@@ -502,7 +502,7 @@ int main(int argc, char* argv[])
             
             glUniform1f(roll_, player.screen_config[i].roll);
             glUniform1f(pitch_, player.screen_config[i].pitch);
-            glUniform1f(heading_, player.screen_config[i].height);
+            glUniform1f(heading_, player.screen_config[i].heading);
             glUniform1f(originX_, player.screen_config[i].originX);
             glUniform1f(originY_, player.screen_config[i].originY);
             glUniform1f(originZ_, player.screen_config[i].originZ);
