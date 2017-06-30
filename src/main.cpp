@@ -165,6 +165,8 @@ int main(int argc, char* argv[])
         glUniform1i(video_texture_, 0);
     }
     
+    int64_t last_server_seek = -AV_TIME_BASE;
+    
     bool decoded_all = false;
     
     double current_frame_end = -1;
@@ -313,6 +315,17 @@ int main(int argc, char* argv[])
         now = av_gettime_relative() - start;
         
         double now_f = now / 1000000.0;
+
+        // send a server time sync every 1/10th of a second
+        if(server && abs(now-last_server_seek) > AV_TIME_BASE/10)
+        {
+            //cout << "Sync\n";
+            Message seek;
+            seek.write_char('N');
+            seek.write_int64(now);
+            server->send(seek);
+            last_server_seek = now;
+        }
         
         // FIXME: factor out message parsing. Handle client/server separately?
         nt->get_messages(messages);
@@ -379,6 +392,15 @@ int main(int argc, char* argv[])
                     }
                     break;
                     
+                    // seek with just 'now' value
+                    case 'N':
+                    {
+                        int64_t server_now = m.read_int64();
+                        start = av_gettime_relative() - server_now;
+                        now = server_now;
+                    }
+                    break;
+                    
                     default:
                         cerr << "Failed to parse message with type '"
                              << type << "'\n";
@@ -411,6 +433,7 @@ int main(int argc, char* argv[])
 //        }
         
         while(seek_flag || now_f > current_frame_end)
+        //while(now_f > current_frame_end)
         {
             show_frame_prev = show_frame;
             show_frame = decoder.get_frame();
@@ -428,6 +451,7 @@ int main(int argc, char* argv[])
                 now = new_now;
                 
                 seek_flag = false;
+                cout << "SEEK DETECTED, NEW NOW: " << now << '\n';
             }
             
             if(show_frame.frame && show_frame_prev.frame)

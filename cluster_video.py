@@ -82,8 +82,8 @@ def main():
         print "ERROR: can't find video_sphere in current directory!"
         return
     
-    p = Popen([program_path, "--server", "--video", sys.argv[1]], 
-        stdout=PIPE, stderr=PIPE)
+    #p = Popen([program_path, "--server", "--video", sys.argv[1]], 
+    #    stdout=PIPE, stderr=PIPE)
     
     INSTANCES = len(config)
     pool = Pool(INSTANCES)

@@ -191,6 +191,24 @@ continue_point:         // loop start
                 showable_frames.pop_front();
             }
             
+//            while(av_read_frame(format_context, &packet) >= 0)
+//            {
+//                if(packet.stream_index == video_stream_index)
+//                {
+//                    int64_t pts = packet.pts;                    
+//                    av_free_packet(&packet);
+//                    
+//                    if(packet.pts >= seek_to)
+//                    {
+//                        break;
+//                    }                    
+//                }
+//                else
+//                {
+//                    av_free_packet(&packet);
+//                }
+//            }
+//            
             // next frame decoded may have weird timestamp because of seeking
             // so, playback thread should adjust time when it sees this frame!
             show_frame.seek_result = true;
