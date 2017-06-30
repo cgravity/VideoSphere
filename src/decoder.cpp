@@ -176,9 +176,13 @@ continue_point:         // loop start
     }
     else
     {
-        if(flush_flag)
+        if(seek_flag)
         {
-            flush_flag = false;        
+            seek_flag = false;        
+            
+            av_seek_frame(format_context, video_stream_index, 
+                seek_to, AVSEEK_FLAG_BACKWARD);
+            
             avcodec_flush_buffers(codec_context);
             
             while(showable_frames.size())

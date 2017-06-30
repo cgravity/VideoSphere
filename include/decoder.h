@@ -48,7 +48,7 @@ struct Decoder
     int video_stream_index;
     int audio_stream_index; // FIXME: unused
     
-    bool flush_flag; // set by seek to tell decoder thread to flush old data
+    bool seek_flag; // set by seek to tell decoder thread to flush old data
     int64_t seek_to;
     
     Decoder()
@@ -66,7 +66,7 @@ struct Decoder
         video_stream_index = -1;
         audio_stream_index = -1;
         
-        flush_flag = false;
+        seek_flag = false;
     }
     
     // opens a video file, returning true if successful
@@ -77,18 +77,8 @@ struct Decoder
     {
         pthread_mutex_lock(&mutex);
         
-        av_seek_frame(format_context, video_stream_index, 
-            seek_to, AVSEEK_FLAG_BACKWARD);
-        
-        flush_flag = true;
+        seek_flag = true;
         this->seek_to = seek_to;
-        
-        // flush visible frames
-        while(showable_frames.size())
-        {
-            fillable_frames.push_back(showable_frames.front().frame);
-            showable_frames.pop_front();
-        }
         
         pthread_mutex_unlock(&mutex);
     }
