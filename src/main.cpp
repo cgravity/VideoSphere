@@ -124,6 +124,12 @@ int main(int argc, char* argv[])
     
     GLint mono_equirect_program = load_shaders(mono_equirect_files);
     
+    vector<string> aa_mono_equirect_files;
+    aa_mono_equirect_files.push_back("shaders/simple-mono.vert");
+    aa_mono_equirect_files.push_back("shaders/aa-mono.frag");
+    
+    GLint aa_mono_equirect_program = load_shaders(aa_mono_equirect_files);
+    
     
     // select which shader to use
     GLint shader_program;
@@ -131,7 +137,7 @@ int main(int argc, char* argv[])
     if(server)
         shader_program = no_distort_program;
     else
-        shader_program = mono_equirect_program;
+        shader_program = aa_mono_equirect_program;
     
     
     
@@ -188,6 +194,8 @@ int main(int argc, char* argv[])
     
     bool quit = false;
     
+    bool dump_frame_flag = false;
+    
     int64_t last_frame_start = av_gettime_relative();
     int64_t current_frame_start = av_gettime_relative();
     while(!quit)
@@ -203,7 +211,7 @@ int main(int argc, char* argv[])
         glfwPollEvents();
         
         if(server)
-        {
+        {   
             joystick.update(js_new);
             
             if(js_new.valid)
@@ -221,6 +229,16 @@ int main(int argc, char* argv[])
                 // i.e. curr holds new current state, prev holds new prev state
                 // (old curr state) and new is a buffer than can be 
                 // overwritten (old prev state).
+                
+                if(js_curr.button_arrow_down && !js_prev.button_arrow_down)
+                {
+                    if(server) {
+                        Message k;
+                        k.write_char('K');
+                         
+                        server->send(k);
+                    }
+                }
                 
                 if(js_curr.button_arrow_right && !js_prev.button_arrow_right)
                 {
@@ -260,6 +278,16 @@ int main(int argc, char* argv[])
             {
                 cout << "!!! NOW: " 
                      << print_timestamp(now) << '\n';
+                 
+                 //dump_frame_flag = true;
+                 
+                 if(server) {
+                     Message k;
+                     k.write_char('K');
+                     
+                     server->send(k);
+                 }
+                 
             }
              
             space_down = true;
@@ -465,6 +493,26 @@ int main(int argc, char* argv[])
                     }
                     break;
                     
+                    case 'K':
+                    {
+                        if(server)
+                            break;
+                        
+                        if(shader_program == mono_equirect_program)
+                            shader_program = aa_mono_equirect_program;
+                        else
+                            shader_program = mono_equirect_program;
+                        
+                        for(size_t i = 0; i < player.windows.size(); i++)
+                        {
+                            glfwMakeContextCurrent(player.windows[i]);
+                            glUseProgram(shader_program);
+                            glEnable(GL_TEXTURE_2D);
+                        }
+                        glfwMakeContextCurrent(player.windows[0]);
+                    }
+                    break;
+                    
                     default:
                         cerr << "Failed to parse message with type '"
                              << type << "'\n";
@@ -562,6 +610,18 @@ int main(int argc, char* argv[])
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
             decoder.codec_context->width, decoder.codec_context->height,
             0, GL_RGB, GL_UNSIGNED_BYTE, show_frame.frame->data[0]);
+        
+        //glGenerateMipmap(GL_TEXTURE_2D);
+        
+        if(dump_frame_flag)
+        {
+            SaveFrame(show_frame.frame, 
+                decoder.codec_context->width, 
+                decoder.codec_context->height,
+                0);
+            
+            dump_frame_flag = false;
+        }
         
         decoder.return_frame(show_frame);
         

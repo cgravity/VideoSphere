@@ -71,6 +71,8 @@ bool Decoder::open(const std::string& path)
     avcodec_parameters_to_context(codec_context,
         format_context->streams[video_stream_index]->codecpar);
     
+    codec_context->thread_count = 4;
+    
     AVDictionary* opts = NULL;
     av_dict_set(&opts, "recounted_frames", "1", 0);
     

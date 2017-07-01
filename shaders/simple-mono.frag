@@ -24,27 +24,13 @@ vec2 vec3_to_latlong(vec3 vec)
 void main()
 {
     vec2 latlong = vec3_to_latlong(normalize(pos));
-    
-//    float lat = latlong.x + phi;
-//    float lon = mod(latlong.y + theta, TURN);
 
     float lat = latlong.x;
     float lon = mod(latlong.y, TURN);
     
     float x = lon / TURN;
     float y = ((lat / (0.25*TURN) + 1.0)) / 2.0;
-    
-    if(y > 1)
-    {
-        gl_FragColor = vec4(1,0,0,1);
-    }
-    else if(y < 0)
-    {
-        gl_FragColor = vec4(0,0,1,1);
-    }
-    else
-    {
-        gl_FragColor = texture2D(video_texture, vec2(1-x,1-y));
-    }
+
+    gl_FragColor = texture2D(video_texture, vec2(1-x,1-y));
 }
 

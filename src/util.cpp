@@ -123,6 +123,8 @@ void SaveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
   char szFilename[32];
   int  y;
   
+  cout << "save frame\n";
+  
   // Open file
   sprintf(szFilename, "frame%d.ppm", iFrame);
   pFile=fopen(szFilename, "wb");
