@@ -65,6 +65,9 @@ struct Player
     
     int monitor;
     
+    bool stereo;
+    bool paused;
+    
     Player()
     {
         type = NT_UNDEFINED;
@@ -76,6 +79,8 @@ struct Player
         monitor = -1; // indicates create a window on all monitors listed
         
         seek_flag = false;
+        stereo = false;
+        paused = false;
     }
     
     // starts up the networking and decoder based on type.

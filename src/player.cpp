@@ -190,6 +190,12 @@ void parse_args(Player& player, int argc, char* argv[])
                 fatal("Failed to parse monitor index!");
             continue;
         }
+        
+        if(argv[i] == string("--stereo"))
+        {
+            player.stereo = true;
+            continue;
+        }
     }
     
     // sanity checks

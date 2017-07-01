@@ -124,6 +124,7 @@ int main(int argc, char* argv[])
     
     GLint mono_equirect_program = load_shaders(mono_equirect_files);
     
+    
     vector<string> aa_mono_equirect_files;
     aa_mono_equirect_files.push_back("shaders/simple-mono.vert");
     aa_mono_equirect_files.push_back("shaders/aa-mono.frag");
@@ -131,13 +132,24 @@ int main(int argc, char* argv[])
     GLint aa_mono_equirect_program = load_shaders(aa_mono_equirect_files);
     
     
+    vector<string> stereo_equirect_files;
+    stereo_equirect_files.push_back("shaders/simple-stereo.vert");
+    stereo_equirect_files.push_back("shaders/simple-stereo.frag");
+    
+    GLint stereo_equirect_program = load_shaders(stereo_equirect_files);
+    
     // select which shader to use
     GLint shader_program;
     
     if(server)
         shader_program = no_distort_program;
     else
-        shader_program = aa_mono_equirect_program;
+    {
+        if(player.stereo)
+            shader_program = stereo_equirect_program;
+        else
+            shader_program = aa_mono_equirect_program;
+    }
     
     
     
@@ -183,6 +195,7 @@ int main(int argc, char* argv[])
     bool down_down = false;
     
     bool space_down = false;
+    bool enter_down = false;
     
     GLFWwindow* window = player.windows[0];
     
@@ -299,6 +312,24 @@ int main(int argc, char* argv[])
         if(glfwGetKey(player.windows[i], GLFW_KEY_ESCAPE))
             quit = true;
         
+        if(glfwGetKey(player.windows[i], GLFW_KEY_ENTER))
+        {
+            if(!enter_down)
+            {
+                player.paused = !player.paused;
+                if(server)
+                {
+                    Message x;
+                    x.write_char('X');
+                    server->send(x);
+                }
+            }
+            
+            enter_down = true;
+        }
+        else
+            enter_down = false;
+        
         if(glfwGetKey(player.windows[i], GLFW_KEY_LEFT))
         {
             if(!left_down)
@@ -403,7 +434,8 @@ int main(int argc, char* argv[])
         decoded_all = decoder.decoded_all_flag;
         decoder.unlock();
         
-        now = av_gettime_relative() - start;
+        if(!player.paused)
+            now = av_gettime_relative() - start;
         
         double now_f = now / 1000000.0;
 
@@ -461,6 +493,12 @@ int main(int argc, char* argv[])
                 
                 switch(type)
                 {
+                    case 'X':
+                    {
+                        player.paused = !player.paused;
+                    }
+                    break;
+                    
                     case 'P':
                     {
                         cerr << "Network path value sent at inappropriate time\n";
@@ -606,6 +644,24 @@ int main(int argc, char* argv[])
         
         //printf("Frame end: %f, NOW: %f\n", current_frame_end, now_f);
         
+//        // fill bottom half with red (Debug tool)
+//        for(size_t y = decoder.codec_context->height/2; 
+//            y < decoder.codec_context->height;
+//            y++)
+//        {
+//            for(size_t x = 0; x < decoder.codec_context->width; x++)
+//            {
+//                show_frame.frame->data[0][
+//                    3*(y*decoder.codec_context->width + x)+0] = 0xFF;
+//                    
+//                show_frame.frame->data[0][
+//                    3*(y*decoder.codec_context->width + x)+1] = 0x00;
+//                    
+//                show_frame.frame->data[0][
+//                    3*(y*decoder.codec_context->width + x)+2] = 0x00;
+//            }
+//        }
+        
         glfwMakeContextCurrent(player.windows[0]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
             decoder.codec_context->width, decoder.codec_context->height,
@@ -657,29 +713,60 @@ int main(int argc, char* argv[])
             glUniform1f(width_, player.screen_config[i].width);
             glUniform1f(height_, player.screen_config[i].height);
             
-            glBegin(GL_QUADS);
+            if(server || !player.stereo)
             {
-                // top left
-                glVertexAttrib3f(pos, -11, 2*1.5, 6);
-                glTexCoord2f(0, 0); // only used by server
-                glVertex2f(-1, 1);
-                
-                // bottom left
-                glVertexAttrib3f(pos, -11, 2*1.5, -6);
-                glTexCoord2f(0, 1);
-                glVertex2f(-1, -1);
+                glBegin(GL_QUADS);
+                    // top left
+                    glVertexAttrib3f(pos, -11, 2*1.5, 6);
+                    glTexCoord2f(0, 0); // only used by server
+                    glVertex2f(-1, 1);
+                    
+                    // bottom left
+                    glVertexAttrib3f(pos, -11, 2*1.5, -6);
+                    glTexCoord2f(0, 1);
+                    glVertex2f(-1, -1);
 
-                // bottom right
-                glVertexAttrib3f(pos, 11, 2*1.5, -6);
-                glTexCoord2f(1,1);
-                glVertex2f(1,-1);
-                
-                // top right
-                glVertexAttrib3f(pos, 11, 2*1.5, 6);
-                glTexCoord2f(1, 0);
-                glVertex2f(1,1);
+                    // bottom right
+                    glVertexAttrib3f(pos, 11, 2*1.5, -6);
+                    glTexCoord2f(1,1);
+                    glVertex2f(1,-1);
+                    
+                    // top right
+                    glVertexAttrib3f(pos, 11, 2*1.5, 6);
+                    glTexCoord2f(1, 0);
+                    glVertex2f(1,1);            
+                glEnd();
             }
-            glEnd();
+            else
+            {
+                // top/bottom stereo
+                GLint stereo_  = 
+                    glGetUniformLocation(shader_program, "stereo_half");
+                    
+                glUniform1f(stereo_, 1.0);
+                glBegin(GL_QUADS);
+                    glVertexAttrib3f(pos, -1, 1, 0);
+                    glVertex2f(-1, 1);
+                    glVertexAttrib3f(pos, -1, -1, 0);
+                    glVertex2f(-1, 0);
+                    glVertexAttrib3f(pos, 1, -1, 0);
+                    glVertex2f(1,0);
+                    glVertexAttrib3f(pos, 1, 1, 0);
+                    glVertex2f(1,1);
+                glEnd();
+                    
+                glUniform1f(stereo_, 0.0);
+                glBegin(GL_QUADS);
+                    glVertexAttrib3f(pos, -1, 1, 0);
+                    glVertex2f(-1, 0);
+                    glVertexAttrib3f(pos, -1, -1, 0);
+                    glVertex2f(-1, -1);
+                    glVertexAttrib3f(pos, 1, -1, 0);
+                    glVertex2f(1,-1);
+                    glVertexAttrib3f(pos, 1, 1, 0);
+                    glVertex2f(1,0);
+                glEnd();
+            }
         
             glfwSwapBuffers(player.windows[i]);
         }
