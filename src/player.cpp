@@ -144,7 +144,7 @@ void parse_args(Player& player, int argc, char* argv[])
     // need to wait to determine if we're client or server before setup
     string mc_group_ip;
     string mc_iface_ip;
-    unsigned short mc_port = VIDEO_SPHERE_PORT;
+    unsigned short mc_port = MULTICAST_DEFAULT_PORT;
     int mc_ttl = 1;
     
     cerr << "DEBUG arguments\n";

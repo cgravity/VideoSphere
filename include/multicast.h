@@ -10,6 +10,8 @@
 #include <vector>
 #include <string>
 
+#define MULTICAST_DEFAULT_PORT 4546
+
 struct MC_Client
 {
     pthread_t thread;
