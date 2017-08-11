@@ -11,6 +11,7 @@ std::string slurp(const std::string& filename);
 bool endswith(const std::string& data, const std::string& pattern);
 bool parse_float(float& into, char* from);
 bool parse_int(int& into, char* from);
+bool parse_ushort(unsigned short& into, char* from);
 
 void fatal(std::string why);
 

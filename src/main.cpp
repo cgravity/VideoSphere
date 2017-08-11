@@ -468,11 +468,14 @@ int main(int argc, char* argv[])
                 {
                     // new connection
                     // send the video path and seek time
+                    // frame size attached to video path for multicast clients
                     Message path;
                     Message seek;
                     
                     path.write_char('P');
                     path.write_string(player.video_path);
+                    path.write_uint32(decoder.codec_context->width);
+                    path.write_uint32(decoder.codec_context->height);
                     
                     seek.write_char('S');
                     seek.write_int64(now);
@@ -519,7 +522,7 @@ int main(int argc, char* argv[])
                     {
                         phi = m.read_float();
                         theta = m.read_float();
-                        cout << "T";
+                        //cout << "T";
                     }
                     break;
                     
@@ -664,9 +667,31 @@ int main(int argc, char* argv[])
 //        }
         
         glfwMakeContextCurrent(player.windows[0]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-            decoder.codec_context->width, decoder.codec_context->height,
-            0, GL_RGB, GL_UNSIGNED_BYTE, show_frame.frame->data[0]);
+        
+        if(player.use_multicast && !player.type == NT_SERVER)
+        {
+            // clients running multicast should load frame from mc_client
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                player.mc_client.width, player.mc_client.height,
+                0, GL_RGB, GL_UNSIGNED_BYTE, &player.mc_client.data[0]);
+        }
+        else
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                decoder.codec_context->width, decoder.codec_context->height,
+                0, GL_RGB, GL_UNSIGNED_BYTE, show_frame.frame->data[0]);
+        }
+        
+        if(player.use_multicast && player.type == NT_SERVER)
+        {
+            // servers running multicast need to transmit frame data
+            size_t size = decoder.codec_context->width;
+            size *= decoder.codec_context->height;
+            size *= 3; // RGB
+            
+            player.mc_server.send(size, show_frame.frame->data[0]);
+        }
+        
         
         //glGenerateMipmap(GL_TEXTURE_2D);
         

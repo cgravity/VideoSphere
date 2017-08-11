@@ -62,6 +62,12 @@ void Player::start_threads()
                             
                         case 'P':
                             path = m.read_string();
+                            if(use_multicast)
+                            {
+                                mc_client.width = m.read_uint32();
+                                mc_client.height = m.read_uint32();
+                                mc_client.setup_data();
+                            }
                             break;
                     }
                 }
@@ -82,31 +88,39 @@ void Player::start_threads()
         {
             cout << "Using network received path\n";
         }
-            
-        bool ok = decoder.open(path);
         
-        if(!ok)
+        if(!use_multicast)
         {
-            cerr << "Can't open that path!\n";
-            cerr << "Path: " << path << '\n';
-            exit(EXIT_FAILURE);   
+            bool ok = decoder.open(path);
+            
+            if(!ok)
+            {
+                cerr << "Can't open that path!\n";
+                cerr << "Path: " << path << '\n';
+                exit(EXIT_FAILURE);   
+            }
+            
+            decoder.add_fillable_frames(24*5);
+            decoder.start_thread();
+            
+            // now is set in microseconds (assuming AV_TIME_BASE = 1000000)
+            // decoder.time_base is a fraction (in seconds) per frame
+            // discrete ticks of it are times to seek to?
+            
+            int64_t seek_to = av_rescale(now, 
+                decoder.time_base.den, decoder.time_base.num);
+            
+            seek_to /= AV_TIME_BASE;
+            
+            decoder.seek(seek_to);
+            
+            cout << "SEEK TO: " << seek_to << '\n';
         }
-        
-        decoder.add_fillable_frames(24*5);
-        decoder.start_thread();
-        
-        // now is set in microseconds (assuming AV_TIME_BASE = 1000000)
-        // decoder.time_base is a fraction (in seconds) per frame
-        // discrete ticks of it are times to seek to?
-        
-        int64_t seek_to = av_rescale(now, 
-            decoder.time_base.den, decoder.time_base.num);
-        
-        seek_to /= AV_TIME_BASE;
-        
-        decoder.seek(seek_to);
-        
-        cout << "SEEK TO: " << seek_to << '\n';
+        else
+        {
+            cout << "Client wants multicast\n";
+            mc_client.start_thread();
+        }
     }
     else
     {
@@ -125,6 +139,13 @@ void parse_args(Player& player, int argc, char* argv[])
         cerr << "USAGE: ./video_sphere --client <hostname-or-ip> --config <path> [--host <host>]\n";
         exit(EXIT_FAILURE);
     }
+    
+    // multicast settings
+    // need to wait to determine if we're client or server before setup
+    string mc_group_ip;
+    string mc_iface_ip;
+    unsigned short mc_port = VIDEO_SPHERE_PORT;
+    int mc_ttl = 1;
     
     cerr << "DEBUG arguments\n";
     for(int i = 0; i < argc; i++)
@@ -146,6 +167,50 @@ void parse_args(Player& player, int argc, char* argv[])
             
             player.type = NT_CLIENT;
             player.server_address = argv[i];
+            continue;
+        }
+        
+        if(argv[i] == string("--mcgroup"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected multicast group IP after --mcgroup");
+            
+            mc_group_ip = argv[i];
+            continue;
+        }
+        
+        if(argv[i] == string("--mciface"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected multicast interface IP after --mciface");
+            
+            mc_iface_ip = argv[i];
+            continue;
+        }
+        
+        if(argv[i] == string("--mcport"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected multicast port after --mcport");
+            
+            bool ok = parse_ushort(mc_port, argv[i]);
+            if(!ok)
+                fatal("Failed to parse multicast port");
+            continue;
+        }
+        
+        if(argv[i] == string("--mcttl"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected multicast TTL after --mcttl");
+            
+            bool ok = parse_int(mc_ttl, argv[i]);
+            if(!ok)
+                fatal("Failed to parse multicast TTL");
             continue;
         }
         
@@ -231,6 +296,31 @@ void parse_args(Player& player, int argc, char* argv[])
         if(player.screen_config.size() == 0)
             fatal("Failed to find any screens in config file for host: " +
                 player.hostname);
+    }
+    
+    if(!mc_group_ip.empty())
+    {
+        if(player.type == NT_SERVER)
+        {
+            player.mc_server.setup_fd(
+                mc_group_ip, 
+                mc_iface_ip, 
+                mc_port,
+                mc_ttl);
+        }
+        else if(player.type == NT_CLIENT)
+        {
+            player.mc_client.setup_fd(
+                mc_group_ip,
+                mc_iface_ip,
+                mc_port);
+        }
+        else
+        {
+            fatal("Must set client or server to use multicast settings");
+        }
+        
+        player.use_multicast = true;
     }
 }
 

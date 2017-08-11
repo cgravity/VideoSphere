@@ -3,6 +3,7 @@
 #include "screen.h"
 #include "network.h"
 #include "decoder.h"
+#include "multicast.h"
 
 #include <vector>
 #include <string>
@@ -63,6 +64,10 @@ struct Player
     // used by clients to indicate name in CalVR config
     std::string hostname;       
     
+    bool use_multicast;
+    MC_Server mc_server;
+    MC_Client mc_client;
+    
     int monitor;
     
     bool stereo;
@@ -81,6 +86,8 @@ struct Player
         seek_flag = false;
         stereo = false;
         paused = false;
+        
+        use_multicast = false;
     }
     
     // starts up the networking and decoder based on type.

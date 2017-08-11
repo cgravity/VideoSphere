@@ -67,6 +67,11 @@ bool parse_int(int& into, char* from)
     return sscanf(from, "%d", &into) == 1;
 }
 
+bool parse_ushort(unsigned short& into, char* from)
+{
+    return sscanf(from, "%hu", &into) == 1;
+}
+
 void fatal(string why)
 {
     cerr << why << '\n';
