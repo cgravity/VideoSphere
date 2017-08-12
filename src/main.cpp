@@ -428,7 +428,7 @@ int main(int argc, char* argv[])
             turn.write_float(phi);
             turn.write_float(theta);
             
-            //server->send(turn);
+            server->send(turn);
         }
         
         decoder.lock();
@@ -447,7 +447,7 @@ int main(int argc, char* argv[])
             Message seek;
             seek.write_char('N');
             seek.write_int64(now);
-            //server->send(seek);
+            server->send(seek);
             last_server_seek = now;
         }
         
