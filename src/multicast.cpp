@@ -10,6 +10,7 @@ using namespace std;
 struct MC_Header
 {
     uint64_t start_pos;
+    uint64_t tick;
     uint16_t length;
 } __attribute__((packed));
 
@@ -39,6 +40,7 @@ void MC_Client::loop()
     
     MC_Header header;
     unsigned char msgbuf[0xFFFF];
+    memset(msgbuf, 0, sizeof(msgbuf));
     
     struct iovec iov[2];
     iov[0].iov_base = &header;
@@ -65,15 +67,21 @@ void MC_Client::loop()
             exit(1);
         }
         
-        if(header.start_pos >= data.size())
+        if(header.start_pos >= buffer[2].size())
             continue; // bad packet
         
-        if(header.start_pos + header.length >= data.size())
+        if(header.start_pos + header.length >= buffer[2].size())
             continue; // bad packet
+        
+        if(header.tick > frame_tick[2])
+        {
+            network_flip();
+            frame_tick[2] = header.tick;
+        }
         
         for(int i = 0; i < header.length; i++)
         {
-            data[header.start_pos + i] = msgbuf[i];
+            buffer[2][header.start_pos + i] = msgbuf[i];
         }
     }
 }
@@ -140,6 +148,8 @@ MC_Server::MC_Server()
     //max_chunk_size = 0xFFFF - sizeof(MC_Header) - 256;
     max_chunk_size = 1024;
     addrlen = sizeof(addr);
+    
+    tick = 0;
 }
 
 void MC_Server::send(uint64_t length, unsigned char* data)
@@ -147,6 +157,7 @@ void MC_Server::send(uint64_t length, unsigned char* data)
     MC_Header header;
     header.start_pos = 0;
     header.length = MIN(max_chunk_size, length);
+    header.tick = tick;
     
     struct iovec iov[2];
     iov[0].iov_base = &header;
@@ -173,6 +184,8 @@ void MC_Server::send(uint64_t length, unsigned char* data)
         
         header.length = MIN(max_chunk_size, length);
     }
+    
+    tick++;
 }
 
 void MC_Server::setup_fd(
@@ -214,5 +227,24 @@ void MC_Server::setup_fd(
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr(multicast_ip.c_str());
     addr.sin_port = htons(port);
+}
+
+void MC_Client::player_poll()
+{
+    lock();
+    if(frame_tick[1] > frame_tick[0])
+    {
+        buffer[0].swap(buffer[1]);
+        swap(frame_tick[0], frame_tick[1]);
+    }
+    unlock();
+}
+
+void MC_Client::network_flip()
+{
+    lock();
+        buffer[1].swap(buffer[2]);
+        swap(frame_tick[1], frame_tick[2]);
+    unlock();
 }
 

@@ -428,7 +428,7 @@ int main(int argc, char* argv[])
             turn.write_float(phi);
             turn.write_float(theta);
             
-            server->send(turn);
+            //server->send(turn);
         }
         
         decoder.lock();
@@ -447,7 +447,7 @@ int main(int argc, char* argv[])
             Message seek;
             seek.write_char('N');
             seek.write_int64(now);
-            server->send(seek);
+            //server->send(seek);
             last_server_seek = now;
         }
         
@@ -586,6 +586,7 @@ int main(int argc, char* argv[])
 //            current_frame_end = 0;
 //        }
         
+    if(!(player.type == NT_CLIENT && player.use_multicast)) {
         while(seek_flag || now_f > current_frame_end)
         //while(now_f > current_frame_end)
         {
@@ -666,14 +667,18 @@ int main(int argc, char* argv[])
 //            }
 //        }
         
+    } // only update decoder if not client multicast
+    
         glfwMakeContextCurrent(player.windows[0]);
         
         if(player.use_multicast && player.type != NT_SERVER)
         {
             // clients running multicast should load frame from mc_client
+            player.mc_client.player_poll();
+            
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                 player.mc_client.width, player.mc_client.height,
-                0, GL_RGB, GL_UNSIGNED_BYTE, &player.mc_client.data[0]);
+                0, GL_RGB, GL_UNSIGNED_BYTE, &player.mc_client.buffer[0][0]);
         }
         else
         {
