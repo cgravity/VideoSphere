@@ -137,7 +137,8 @@ MC_Server::MC_Server()
 {
     fd = 0;
     // leave some overhead for IP headers, etc.
-    max_chunk_size = 0xFFFF - sizeof(MC_Header) - 256;
+    //max_chunk_size = 0xFFFF - sizeof(MC_Header) - 256;
+    max_chunk_size = 1024;
     addrlen = sizeof(addr);
 }
 
@@ -148,7 +149,8 @@ void MC_Server::send(uint64_t length, unsigned char* data)
     header.length = MIN(max_chunk_size, length);
     
     struct iovec iov[2];
-    iov[0].iov_base = data;
+    iov[0].iov_base = &header;
+    iov[0].iov_len  = sizeof(header);
     
     struct msghdr msg;
     memset(&msg, 0, sizeof(msg));
@@ -160,8 +162,10 @@ void MC_Server::send(uint64_t length, unsigned char* data)
     
     while(length != 0)
     {
+        iov[1].iov_base = data;
         iov[1].iov_len = header.length;
-        sendmsg(fd, &msg, 0);
+        if(sendmsg(fd, &msg, 0) < 0)
+            perror("sendmsg");
         
         length -= header.length;
         header.start_pos += header.length;
@@ -177,7 +181,6 @@ void MC_Server::setup_fd(
     unsigned short port,
     unsigned int ttl)
 {
-    struct sockaddr_in addr;
     struct ip_mreq mreq;
     
     // create the socket

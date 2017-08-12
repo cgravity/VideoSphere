@@ -668,7 +668,7 @@ int main(int argc, char* argv[])
         
         glfwMakeContextCurrent(player.windows[0]);
         
-        if(player.use_multicast && !player.type == NT_SERVER)
+        if(player.use_multicast && player.type != NT_SERVER)
         {
             // clients running multicast should load frame from mc_client
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,

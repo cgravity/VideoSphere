@@ -22,4 +22,5 @@ void test_screen_parse();
 void monitor_test();
 
 void SaveFrame(AVFrame *pFrame, int width, int height, int iFrame);
+void SaveFrame(unsigned char* bytes, int width, int height);
 

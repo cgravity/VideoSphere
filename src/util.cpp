@@ -147,6 +147,30 @@ void SaveFrame(AVFrame *pFrame, int width, int height, int iFrame) {
   fclose(pFile);
 }
 
+void SaveFrame(unsigned char* bytes, int width, int height) {
+  FILE *pFile;
+  char szFilename[32];
+  int  y;
+  
+  cout << "save frame\n";
+  
+  // Open file
+  sprintf(szFilename, "frame.ppm");
+  pFile=fopen(szFilename, "wb");
+  if(pFile==NULL)
+    return;
+  
+  // Write header
+  fprintf(pFile, "P6\n%d %d\n255\n", width, height);
+  
+  // Write pixel data
+  fwrite(bytes, height, width*3, pFile);
+  
+  // Close file
+  fclose(pFile);
+}
+
+
 string print_timestamp(int64_t time)
 {
     time /= AV_TIME_BASE;
