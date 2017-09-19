@@ -436,6 +436,17 @@ class NetworkThread
     virtual void loop() = 0;
 };
 
+// Dummy mode doesn't do any networking
+class DummyNetworkingThread : public NetworkThread
+{
+  public:
+    virtual void send(const std::vector<unsigned char>& data) {}
+    virtual void send(const std::string& data) {}
+    virtual void send(const Message& m) {}
+    virtual void start_thread();
+    virtual void loop() {}
+};
+
 class Server : public NetworkThread
 {
     std::vector<pollfd> pollfds;

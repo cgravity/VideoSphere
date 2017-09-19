@@ -25,6 +25,20 @@ void Player::start_threads()
         decoder.add_fillable_frames(24*5);
         decoder.start_thread();
     }
+    else if(type == NT_HEADLESS)
+    {
+        server = new Server();
+        nt = server;
+        nt->start_thread();
+        
+        bool ok = decoder.open(video_path);
+        
+        if(!ok)
+            exit(EXIT_FAILURE);
+        
+        decoder.add_fillable_frames(24*5);
+        decoder.start_thread();
+    }
     else if(type == NT_CLIENT)
     {
         client = new Client(server_address, VIDEO_SPHERE_PORT);
@@ -124,7 +138,7 @@ void Player::start_threads()
     }
     else
     {
-        cerr << "You must specify --client or --server!\n";
+        cerr << "You must specify --client, --server, or --headless!\n";
         exit(EXIT_FAILURE);
     }
 }
@@ -167,6 +181,12 @@ void parse_args(Player& player, int argc, char* argv[])
             
             player.type = NT_CLIENT;
             player.server_address = argv[i];
+            continue;
+        }
+        
+        if(argv[i] == string("--headless"))
+        {
+            player.type = NT_HEADLESS;
             continue;
         }
         
@@ -265,10 +285,13 @@ void parse_args(Player& player, int argc, char* argv[])
     
     // sanity checks
     if(player.type == NT_UNDEFINED)
-        fatal("must use one of --server or --client as an argument!");
+        fatal("must use one of --server, --client, or --headless as an argument!");
     
     if(player.type == NT_SERVER && player.video_path.size()==0)
         fatal("--video [path] is required for servers!");
+    
+    if(player.type == NT_HEADLESS && player.video_path.size()==0)
+        fatal("--video [path] is required for headless mode!");
     
     if(player.type == NT_CLIENT && player.server_address.size()==0)
         fatal("clients must provide IP or hostname of server!");
@@ -276,6 +299,8 @@ void parse_args(Player& player, int argc, char* argv[])
     if(player.type == NT_CLIENT && player.config_path.size()==0)
         fatal("clients must provide --config [path] arguments!");
     
+    if(player.type == NT_HEADLESS && player.config_path.size()==0)
+        fatal("headless mode must provide --config [path] arguments!");
     
     if(player.hostname.size()==0)
     {

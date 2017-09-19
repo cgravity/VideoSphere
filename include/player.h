@@ -16,7 +16,8 @@ enum NetworkType
 {
     NT_UNDEFINED,
     NT_SERVER,
-    NT_CLIENT
+    NT_CLIENT,
+    NT_HEADLESS
 };
 
 struct Player

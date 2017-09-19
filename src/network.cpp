@@ -257,3 +257,8 @@ void Client::loop()
     }
 }
 
+void DummyNetworkingThread::start_thread()
+{
+    pthread_create(&thread, NULL, network_thread_main, this);
+}
+

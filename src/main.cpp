@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
     // select which shader to use
     GLint shader_program;
     
-    if(server)
+    if(server && player.type != NT_HEADLESS)
         shader_program = no_distort_program;
     else
     {
@@ -681,7 +681,7 @@ int main(int argc, char* argv[])
     
         glfwMakeContextCurrent(player.windows[0]);
         
-        if(player.use_multicast && player.type != NT_SERVER)
+        if(player.use_multicast && player.type == NT_CLIENT)
         {
             // clients running multicast should load frame from mc_client
             player.mc_client.player_poll();
