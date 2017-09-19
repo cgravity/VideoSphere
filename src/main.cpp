@@ -32,6 +32,8 @@ using namespace std;
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include <X11/Xlib.h>
+
 #include "ps3_joystick.h"
 
 #define TURN (2*3.1415926535)
@@ -109,6 +111,14 @@ int main(int argc, char* argv[])
       cerr << "GLEW Error: " << glewGetErrorString(glew_error);
       glfwTerminate();
       return EXIT_FAILURE;
+    }
+    
+    if(player.type == NT_CLIENT)
+    {
+        Display* dpy = XOpenDisplay(0);
+        Window root = XRootWindow(dpy, 0);
+        XWarpPointer(dpy, None, root, 0,0,0,0,  0,0);
+        XCloseDisplay(dpy);
     }
     
     // load shaders
