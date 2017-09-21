@@ -15,7 +15,14 @@ def file_exists(path):
     return os.path.isfile(path)
 
 def run_program(arg):
-    host, display = arg
+    if len(arg) == 2:
+        host, display = arg
+        mcgroup = None
+    elif len(arg) == 4:
+        host, display, mcgroup, mciface = arg
+    else:
+        print "Bad config:", arg
+        return
     
     cmd = [
         "ssh", host, 
@@ -25,8 +32,11 @@ def run_program(arg):
         "--client", SERVER_ADDRESS,
         "--config", CONFIG_PATH,
         "--host", host,
-        "--monitor",  display[display.rfind(".")+1:]
+        "--monitor",  display[display.rfind(".")+1:],
     ]
+    
+    if mcgroup:
+        cmd += ["--mcgroup", mcgroup, "--mciface", mciface]
     
     if stereo:
         cmd += ["--stereo"]
@@ -82,8 +92,8 @@ def main():
     
     # simple sanity checks
     for i, x in enumerate(config):
-        if len(x) != 2:
-            print "Wrong number of entries on line", i
+        if len(x) != 2 and len(x) != 4:
+            print "Wrong number of entries on line", i+2
             return
         
         if x[1].rfind(".") == -1:
