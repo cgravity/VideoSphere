@@ -24,6 +24,13 @@ struct Window_
     GLXContext glx_context;
     Colormap cmap;
     
+    // === Rendering details specific to this window ===
+    GLuint tex;
+    GLint no_distort_program;
+    GLint mono_equirect_program;
+    GLint aa_mono_equirect_program;
+    GLint stereo_equirect_program;
+    
     Window_()
     {
         glfw_window = NULL;

@@ -117,6 +117,7 @@ void parse_screen_config(vector<ScreenConfig>& screens_out,
         }
         else
         {
+            screen.mode = SCM_GLFW;
             cerr << "No mode\n";
         }
         

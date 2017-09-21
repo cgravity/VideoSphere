@@ -130,40 +130,41 @@ int main(int argc, char* argv[])
     no_distort_files.push_back("shaders/no-distort.vert");
     no_distort_files.push_back("shaders/no-distort.frag");
     
-    GLint no_distort_program = load_shaders(no_distort_files);
-    
-    
     vector<string> mono_equirect_files;
     mono_equirect_files.push_back("shaders/simple-mono.vert");
     mono_equirect_files.push_back("shaders/simple-mono.frag");
-    
-    GLint mono_equirect_program = load_shaders(mono_equirect_files);
-    
     
     vector<string> aa_mono_equirect_files;
     aa_mono_equirect_files.push_back("shaders/simple-mono.vert");
     aa_mono_equirect_files.push_back("shaders/aa-mono.frag");
     
-    GLint aa_mono_equirect_program = load_shaders(aa_mono_equirect_files);
-    
-    
     vector<string> stereo_equirect_files;
     stereo_equirect_files.push_back("shaders/simple-stereo.vert");
     stereo_equirect_files.push_back("shaders/simple-stereo.frag");
     
-    GLint stereo_equirect_program = load_shaders(stereo_equirect_files);
+    // need to compile shaders for each window
+    for(size_t i = 0; i < player.windows.size(); i++)
+    {    
+        player.windows[i]->make_current();
+        
+        player.windows[i]->no_distort_program = load_shaders(no_distort_files);
+        player.windows[i]->mono_equirect_program = load_shaders(mono_equirect_files);
+        player.windows[i]->aa_mono_equirect_program = load_shaders(aa_mono_equirect_files);
+        player.windows[i]->stereo_equirect_program = load_shaders(stereo_equirect_files);
+    }
     
     // select which shader to use
-    GLint shader_program;
+    // note use of pointer-to-member so we can access it on each window
+    GLint Window_::* shader_program;
     
     if(server && player.type != NT_HEADLESS)
-        shader_program = no_distort_program;
+        shader_program = &Window_::no_distort_program;
     else
     {
         if(player.stereo)
-            shader_program = stereo_equirect_program;
+            shader_program = &Window_::stereo_equirect_program;
         else
-            shader_program = aa_mono_equirect_program;
+            shader_program = &Window_::aa_mono_equirect_program;
     }
     
     
@@ -175,27 +176,22 @@ int main(int argc, char* argv[])
     {
         //glfwMakeContextCurrent(player.windows[i]);
         player.windows[i]->make_current();
-        glUseProgram(shader_program);
+        glUseProgram(player.windows[i]->*shader_program);
         glEnable(GL_TEXTURE_2D);
-    }
-    //glfwMakeContextCurrent(player.windows[0]);
-    player.windows[0]->make_current();
-    GLuint tex;
-    glGenTextures(1, &tex);
+        
+        glGenTextures(1, &player.windows[i]->tex);
+
+        glBindTexture(GL_TEXTURE_2D, player.windows[i]->tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // FIXME
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // FIXME
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     
-    glBindTexture(GL_TEXTURE_2D, tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // FIXME
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); // FIXME
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
-    for(size_t i = 0; i < player.windows.size(); i++)
-    {
-        //glfwMakeContextCurrent(player.windows[i]);
-        player.windows[i]->make_current();
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, tex);
-        GLint video_texture_ = glGetUniformLocation(shader_program, "video_texture");
+        glBindTexture(GL_TEXTURE_2D, player.windows[i]->tex);
+        GLint video_texture_ = glGetUniformLocation(
+            player.windows[i]->*shader_program, 
+            "video_texture");
         glUniform1i(video_texture_, 0);
     }
     
@@ -561,16 +557,16 @@ int main(int argc, char* argv[])
                         if(server)
                             break;
                         
-                        if(shader_program == mono_equirect_program)
-                            shader_program = aa_mono_equirect_program;
+                        if(shader_program == &Window_::mono_equirect_program)
+                            shader_program = &Window_::aa_mono_equirect_program;
                         else
-                            shader_program = mono_equirect_program;
+                            shader_program = &Window_::mono_equirect_program;
                         
                         for(size_t i = 0; i < player.windows.size(); i++)
                         {
                             //glfwMakeContextCurrent(player.windows[i]);
                             player.windows[i]->make_current();
-                            glUseProgram(shader_program);
+                            glUseProgram(player.windows[i]->*shader_program);
                             glEnable(GL_TEXTURE_2D);
                         }
                         //glfwMakeContextCurrent(player.windows[0]);
@@ -693,22 +689,30 @@ int main(int argc, char* argv[])
     } // only update decoder if not client multicast
     
         //glfwMakeContextCurrent(player.windows[0]);
-        player.windows[0]->make_current();
+        //player.windows[0]->make_current();
         
         if(player.use_multicast && player.type == NT_CLIENT)
         {
             // clients running multicast should load frame from mc_client
             player.mc_client.player_poll();
             
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                player.mc_client.width, player.mc_client.height,
-                0, GL_RGB, GL_UNSIGNED_BYTE, &player.mc_client.buffer[0][0]);
+            for(size_t i = 0; i < player.windows.size(); i++)
+            {
+                player.windows[i]->make_current();
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                    player.mc_client.width, player.mc_client.height,
+                    0, GL_RGB, GL_UNSIGNED_BYTE, &player.mc_client.buffer[0][0]);
+            }
         }
         else
         {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                decoder.codec_context->width, decoder.codec_context->height,
-                0, GL_RGB, GL_UNSIGNED_BYTE, show_frame.frame->data[0]);
+            for(size_t i = 0; i < player.windows.size(); i++)
+            {
+                player.windows[i]->make_current();
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                    decoder.codec_context->width, decoder.codec_context->height,
+                    0, GL_RGB, GL_UNSIGNED_BYTE, show_frame.frame->data[0]);
+            }
         }
         
         if(player.use_multicast && player.type == NT_SERVER)
@@ -741,19 +745,20 @@ int main(int argc, char* argv[])
         {
             //glfwMakeContextCurrent(player.windows[i]);
             player.windows[i]->make_current();
+            GLuint sp = player.windows[i]->*shader_program;
             
-            GLint theta_ = glGetUniformLocation(shader_program, "theta");
-            GLint phi_   = glGetUniformLocation(shader_program, "phi");
-            GLint pos = glGetAttribLocation(shader_program, "pos_in");
+            GLint theta_ = glGetUniformLocation(sp, "theta");
+            GLint phi_   = glGetUniformLocation(sp, "phi");
+            GLint pos = glGetAttribLocation(sp, "pos_in");
             
-            GLint roll_    = glGetUniformLocation(shader_program, "roll");
-            GLint pitch_   = glGetUniformLocation(shader_program, "pitch");
-            GLint heading_ = glGetUniformLocation(shader_program, "heading");
-            GLint originX_ = glGetUniformLocation(shader_program, "originX");
-            GLint originY_ = glGetUniformLocation(shader_program, "originY");
-            GLint originZ_ = glGetUniformLocation(shader_program, "originZ");
-            GLint width_   = glGetUniformLocation(shader_program, "width");
-            GLint height_  = glGetUniformLocation(shader_program, "height");
+            GLint roll_    = glGetUniformLocation(sp, "roll");
+            GLint pitch_   = glGetUniformLocation(sp, "pitch");
+            GLint heading_ = glGetUniformLocation(sp, "heading");
+            GLint originX_ = glGetUniformLocation(sp, "originX");
+            GLint originY_ = glGetUniformLocation(sp, "originY");
+            GLint originZ_ = glGetUniformLocation(sp, "originZ");
+            GLint width_   = glGetUniformLocation(sp, "width");
+            GLint height_  = glGetUniformLocation(sp, "height");
             
             // for 'pos', using convention where x goes to the right, y goes in,
             // and z goes up.
@@ -797,7 +802,7 @@ int main(int argc, char* argv[])
             {
                 // top/bottom stereo
                 GLint stereo_  = 
-                    glGetUniformLocation(shader_program, "stereo_half");
+                    glGetUniformLocation(sp, "stereo_half");
                     
                 glUniform1f(stereo_, 1.0);
                 glBegin(GL_QUADS);
@@ -822,9 +827,12 @@ int main(int argc, char* argv[])
                     glVertexAttrib3f(pos, 1, 1, 0);
                     glVertex2f(1,0);
                 glEnd();
-            }
+            }            
+        }
         
-            //glfwSwapBuffers(player.windows[i]);
+        // swap all together after drawing
+        for(size_t i = 0; i < player.windows.size(); i++)
+        {
             player.windows[i]->swap_buffers();
         }
     }
