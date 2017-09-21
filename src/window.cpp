@@ -6,6 +6,7 @@ void Window_::create_x11(
     const char* display_string, 
     const char* title,
     bool fullscreen,
+    bool override_redirect,
     int x, 
     int y,
     int w,
@@ -58,13 +59,13 @@ void Window_::create_x11(
     swa.background_pixmap = None;
     swa.border_pixel = 0;
     swa.event_mask = StructureNotifyMask | KeyPressMask;
-    swa.override_redirect = False;
+    swa.override_redirect = (override_redirect? True : False);
     swa.cursor = None;
     
     x11_window = XCreateWindow(
         display, 
         RootWindow(display, vi->screen),
-        0,0,1920,1080, 0,
+        x,y,w,h, 0,
         vi->depth,
         InputOutput,
         vi->visual,
@@ -101,7 +102,7 @@ void Window_::create_x11(
         
     XFlush(display);
     
-    GLXContext glx_context = glXCreateNewContext(
+    glx_context = glXCreateNewContext(
         display,
         fb,
         GLX_RGBA_TYPE,

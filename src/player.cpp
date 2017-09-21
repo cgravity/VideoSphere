@@ -165,6 +165,8 @@ void parse_args(Player& player, int argc, char* argv[])
     for(int i = 0; i < argc; i++)
         cerr << "ARG " << i << " : " << argv[i] << '\n';
     
+    bool config_mode_is_calvr = false;
+    
     for(int i = 0; i < argc; i++)
     {
         if(argv[i] == string("--server"))
@@ -254,6 +256,17 @@ void parse_args(Player& player, int argc, char* argv[])
             continue;
         }
         
+        if(argv[i] == string("--calvr-config"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected path to screen config xml after --calvr-config");
+            
+            player.config_path = argv[i];
+            config_mode_is_calvr = true;
+            continue;
+        }
+        
         if(argv[i] == string("--host"))
         {
             i++;
@@ -313,10 +326,20 @@ void parse_args(Player& player, int argc, char* argv[])
     
     if(player.config_path.size())
     {
-        parse_calvr_screen_config(
-            player.screen_config, 
-            player.config_path,
-            player.hostname);
+        if(config_mode_is_calvr)
+        {
+            parse_calvr_screen_config(
+                player.screen_config, 
+                player.config_path,
+                player.hostname);
+        }
+        else
+        {
+            parse_screen_config(
+                player.screen_config,
+                player.config_path,
+                player.hostname);
+        }
         
         if(player.screen_config.size() == 0)
             fatal("Failed to find any screens in config file for host: " +
@@ -367,21 +390,33 @@ void Player::create_windows()
     
     GLFWwindow* share_context = NULL;
     
-    // workaround for starting over SSH on WAVE
-    if(this->monitor >= 0)
-    {
-        if(this->monitor > screen_config.size())
-            fatal("Requested monitor out of range");
-        
-        ScreenConfig sc = screen_config[this->monitor];
-        sc.index = 0;
-        screen_config.clear();
-        screen_config.push_back(sc);
-    }
+//    // workaround for starting over SSH on WAVE
+//    if(this->monitor >= 0)
+//    {
+//        if(this->monitor > screen_config.size())
+//            fatal("Requested monitor out of range");
+//        
+//        ScreenConfig sc = screen_config[this->monitor];
+//        sc.index = 0;
+//        screen_config.clear();
+//        screen_config.push_back(sc);
+//    }
     
     for(size_t i = 0; i < screen_config.size(); i++)
     {
         ScreenConfig& sc = screen_config[i];
+        
+        if(sc.mode == SCM_X11)
+        {
+            Window_* w = new Window_();
+            w->create_x11(sc.display.c_str(), "Video Sphere", 
+                sc.fullscreen, sc.override_redirect, sc.x,
+                sc.y, sc.pixel_width, sc.pixel_height);
+            windows.push_back(w);
+            continue;
+        }
+        
+        // If we got here, sc.mode == SCM_GLFW
         
         GLFWmonitor* monitor = NULL;
         GLFWwindow* window = NULL;
@@ -434,7 +469,10 @@ void Player::create_windows()
             share_context = window;
         
         glfwSetWindowSizeCallback(window, on_window_resize);
-        windows.push_back(window);
+        
+        Window_* w = new Window_();
+        w->glfw_window = window;
+        windows.push_back(w);
     }
 }
 

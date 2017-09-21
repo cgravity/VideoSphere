@@ -1,11 +1,12 @@
 #pragma once
 
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <GL/gl.h>
 #include <GL/glx.h>
-
+#include <cstdio>
 
 #include "util.h"
 
@@ -33,7 +34,8 @@ struct Window_
     void create_x11(
         const char* display_string = NULL, 
         const char* title = "Video Sphere",
-        bool fullscreen = true,
+        bool fullscreen=true,
+        bool override_redirect=false,
         int x = 0, int y = 0, int w = 1920, int h = 1080);
     
     void close()
@@ -60,8 +62,26 @@ struct Window_
     {
         if(glfw_window)
             glfwMakeContextCurrent(glfw_window);
-        else
+        else if(x11_window)
+        {
             glXMakeCurrent(display, x11_window, glx_context);
+        }
+        else
+            std::fprintf(stderr, "Can't make NULL window current!\n");
+    }
+    
+    void swap_buffers()
+    {
+        make_current();
+        
+        if(glfw_window)
+        {
+            glfwSwapBuffers(glfw_window);
+        }
+        else
+        {
+            glXSwapBuffers(display, x11_window);
+        }
     }
 };
 

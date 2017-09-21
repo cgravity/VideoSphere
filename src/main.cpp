@@ -27,10 +27,11 @@ using namespace std;
 #include "player.h"
 #include "shader.h"
 #include "util.h"
-#include "window.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+
+#include "window.h"
 
 #include <X11/Xlib.h>
 
@@ -102,7 +103,8 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     
-    glfwMakeContextCurrent(player.windows[0]);
+    //glfwMakeContextCurrent(player.windows[0]);
+    player.windows[0]->make_current();
         
     // initialize GLEW
     GLenum glew_error = glewInit();
@@ -113,6 +115,8 @@ int main(int argc, char* argv[])
       return EXIT_FAILURE;
     }
     
+    // Fixes weird X Cursor bug when you have two GPUs on CentOS 7
+    // This is very important for the SunCAVE
     if(player.type == NT_CLIENT)
     {
         Display* dpy = XOpenDisplay(0);
@@ -169,11 +173,13 @@ int main(int argc, char* argv[])
     
     for(size_t i = 0; i < player.windows.size(); i++)
     {
-        glfwMakeContextCurrent(player.windows[i]);
+        //glfwMakeContextCurrent(player.windows[i]);
+        player.windows[i]->make_current();
         glUseProgram(shader_program);
         glEnable(GL_TEXTURE_2D);
     }
-    glfwMakeContextCurrent(player.windows[0]);
+    //glfwMakeContextCurrent(player.windows[0]);
+    player.windows[0]->make_current();
     GLuint tex;
     glGenTextures(1, &tex);
     
@@ -185,7 +191,8 @@ int main(int argc, char* argv[])
     
     for(size_t i = 0; i < player.windows.size(); i++)
     {
-        glfwMakeContextCurrent(player.windows[i]);
+        //glfwMakeContextCurrent(player.windows[i]);
+        player.windows[i]->make_current();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, tex);
         GLint video_texture_ = glGetUniformLocation(shader_program, "video_texture");
@@ -208,7 +215,8 @@ int main(int argc, char* argv[])
     bool space_down = false;
     bool enter_down = false;
     
-    GLFWwindow* window = player.windows[0];
+    //GLFWwindow* window = player.windows[0];
+    Window_* window = player.windows[0];
     
     JS_State js_prev, js_curr, js_new;
     PS3Joystick joystick;
@@ -296,7 +304,10 @@ int main(int argc, char* argv[])
       
       for(size_t i = player.windows.size()-1; i < player.windows.size(); i++)
       {
-        if(glfwGetKey(player.windows[i], GLFW_KEY_SPACE))
+        if(!player.windows[i]->glfw_window)
+            continue;
+            
+        if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_SPACE))
         {
             if(!space_down)
             {
@@ -320,10 +331,10 @@ int main(int argc, char* argv[])
             space_down = false;
       
         
-        if(glfwGetKey(player.windows[i], GLFW_KEY_ESCAPE))
+        if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_ESCAPE))
             quit = true;
         
-        if(glfwGetKey(player.windows[i], GLFW_KEY_ENTER))
+        if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_ENTER))
         {
             if(!enter_down)
             {
@@ -341,13 +352,13 @@ int main(int argc, char* argv[])
         else
             enter_down = false;
         
-        if(glfwGetKey(player.windows[i], GLFW_KEY_LEFT))
+        if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_LEFT))
         {
             if(!left_down)
             {
-                if(glfwGetKey(player.windows[i], 
+                if(glfwGetKey(player.windows[i]->glfw_window, 
                     GLFW_KEY_LEFT_SHIFT) || 
-                   glfwGetKey(player.windows[i],
+                   glfwGetKey(player.windows[i]->glfw_window,
                     GLFW_KEY_LEFT_CONTROL))
                 {
                     // go back 10 seconds
@@ -366,14 +377,14 @@ int main(int argc, char* argv[])
         else
             left_down = false;
         
-        if(glfwGetKey(player.windows[i], GLFW_KEY_RIGHT))
+        if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_RIGHT))
         {
             if(!right_down)
             {
                 
-                if(glfwGetKey(player.windows[i], 
+                if(glfwGetKey(player.windows[i]->glfw_window, 
                     GLFW_KEY_LEFT_SHIFT) || 
-                   glfwGetKey(player.windows[i],
+                   glfwGetKey(player.windows[i]->glfw_window,
                     GLFW_KEY_LEFT_CONTROL))
                 {
                     // go forward 10 seconds
@@ -393,7 +404,7 @@ int main(int argc, char* argv[])
         else
             right_down = false;
         
-        if(glfwGetKey(player.windows[i], GLFW_KEY_UP))
+        if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_UP))
         {
             if(!up_down)
             {
@@ -406,7 +417,7 @@ int main(int argc, char* argv[])
         else
             up_down = false;
         
-        if(glfwGetKey(player.windows[i], GLFW_KEY_DOWN))
+        if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_DOWN))
         {
             if(!down_down)
             {
@@ -557,11 +568,13 @@ int main(int argc, char* argv[])
                         
                         for(size_t i = 0; i < player.windows.size(); i++)
                         {
-                            glfwMakeContextCurrent(player.windows[i]);
+                            //glfwMakeContextCurrent(player.windows[i]);
+                            player.windows[i]->make_current();
                             glUseProgram(shader_program);
                             glEnable(GL_TEXTURE_2D);
                         }
-                        glfwMakeContextCurrent(player.windows[0]);
+                        //glfwMakeContextCurrent(player.windows[0]);
+                        player.windows[0]->make_current();
                     }
                     break;
                     
@@ -679,7 +692,8 @@ int main(int argc, char* argv[])
         
     } // only update decoder if not client multicast
     
-        glfwMakeContextCurrent(player.windows[0]);
+        //glfwMakeContextCurrent(player.windows[0]);
+        player.windows[0]->make_current();
         
         if(player.use_multicast && player.type == NT_CLIENT)
         {
@@ -725,7 +739,8 @@ int main(int argc, char* argv[])
         
         for(size_t i = 0; i < player.windows.size(); i++)
         {
-            glfwMakeContextCurrent(player.windows[i]);
+            //glfwMakeContextCurrent(player.windows[i]);
+            player.windows[i]->make_current();
             
             GLint theta_ = glGetUniformLocation(shader_program, "theta");
             GLint phi_   = glGetUniformLocation(shader_program, "phi");
@@ -809,7 +824,8 @@ int main(int argc, char* argv[])
                 glEnd();
             }
         
-            glfwSwapBuffers(player.windows[i]);
+            //glfwSwapBuffers(player.windows[i]);
+            player.windows[i]->swap_buffers();
         }
     }
     

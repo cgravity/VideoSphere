@@ -4,6 +4,7 @@
 #include "network.h"
 #include "decoder.h"
 #include "multicast.h"
+#include "window.h"
 
 #include <vector>
 #include <string>
@@ -48,7 +49,8 @@ struct Player
     std::vector<ScreenConfig> screen_config; 
     
     // windows created based on screen_config, in same order
-    std::vector<GLFWwindow*> windows;
+    //std::vector<GLFWwindow*> windows;
+    std::vector<Window_*> windows;
     
     // used by server or client to indicate video path
     // by default, clients will get this from server
