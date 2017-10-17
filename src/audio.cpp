@@ -22,7 +22,11 @@ static int audio_callback(
     
     for(size_t i = 0; i < 2*frame_count; i++)
     {
-        if(audio->now + i < audio->samples.size())
+        if(audio->paused)
+        {
+            *out++ = 0;
+        }
+        else if(audio->now + i < audio->samples.size())
         {
             *out++ = audio->samples[audio->now + i];
         }
@@ -32,7 +36,8 @@ static int audio_callback(
         }
     }
     
-    audio->now += 2*frame_count;
+    if(!audio->paused)
+        audio->now += 2*frame_count;
     
     audio->unlock();
     return paContinue;
@@ -63,8 +68,8 @@ void Audio::start()
         return;
     }
     
+    cerr << "AUDIO SIZE: " << samples.size()*sizeof(samples[0]) << " bytes\n";
     /*
-    cerr << "SIZE: " << samples.size() << '\n';
     FILE* fp = fopen("debug.dat", "wb");
     fwrite(&samples[0], sizeof(samples[0]), samples.size(), fp);
     fclose(fp);

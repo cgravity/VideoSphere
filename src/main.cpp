@@ -302,7 +302,8 @@ int main(int argc, char* argv[])
       {
         if(!player.windows[i]->glfw_window)
             continue;
-            
+        
+        #if 0
         if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_SPACE))
         {
             if(!space_down)
@@ -325,16 +326,17 @@ int main(int argc, char* argv[])
         }
         else
             space_down = false;
-      
+        #endif
         
         if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_ESCAPE))
             quit = true;
         
-        if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_ENTER))
+        if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_SPACE))
         {
-            if(!enter_down)
+            if(!space_down)
             {
                 player.paused = !player.paused;
+                player.audio.paused = player.paused;
                 if(server)
                 {
                     Message x;
@@ -343,10 +345,10 @@ int main(int argc, char* argv[])
                 }
             }
             
-            enter_down = true;
+            space_down = true;
         }
         else
-            enter_down = false;
+            space_down = false;
         
         if(glfwGetKey(player.windows[i]->glfw_window, GLFW_KEY_LEFT))
         {
@@ -453,7 +455,23 @@ int main(int argc, char* argv[])
         decoder.unlock();
         
         if(!player.paused)
+        {
+            #ifndef NO_AUDIO
+            if(player.audio.setup_state == AuSS_PLAYING)
+            {
+                // sync video to audio timestamp
+                player.audio.lock();
+                now = player.audio.now;
+                player.audio.unlock();
+            }
+            else
+            {
+                now = av_gettime_relative() - start;
+            }
+            #else
             now = av_gettime_relative() - start;
+            #endif
+        }
         
         double now_f = now / 1000000.0;
 

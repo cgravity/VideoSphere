@@ -35,6 +35,8 @@ struct Audio
     int sample_rate; // samples per second
     int now; // in samples
     
+    bool paused;
+    
     PaStream* stream;
     AudioSetupState setup_state;
     
@@ -45,6 +47,8 @@ struct Audio
         now = 0;
         stream = NULL;
         setup_state = AuSS_NO_AUDIO;
+        
+        paused = false;
         
         PaError err = Pa_Initialize();
         
@@ -74,8 +78,9 @@ struct Audio
     {
         lock();
             double when = us / 1000000.0;
-            when = sample_rate * when;
+            when = 2 * sample_rate * when;
             now = when;
+            std::cout << "Audio seek to: " << now << '\n';
         unlock();
     }
     

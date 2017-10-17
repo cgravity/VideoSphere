@@ -450,6 +450,9 @@ continue_point:         // loop start
         if(looping)
         {
             seek(0);
+            #ifndef NO_AUDIO
+            audio->seek(0);
+            #endif
             goto continue_point;
         }
         

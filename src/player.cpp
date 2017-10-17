@@ -613,6 +613,6 @@ void Player::seek(int64_t target)
             decoder.time_base.den, decoder.time_base.num);    
     seek_to /= AV_TIME_BASE;
     decoder.seek(seek_to);
-    
+    audio.seek(target);
 }
 
