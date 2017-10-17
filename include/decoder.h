@@ -13,6 +13,10 @@ extern "C" {
 
 #include <iostream>
 
+#ifndef NO_AUDIO
+#include "audio.h"
+#endif
+
 struct DecoderFrame
 {
     AVFrame* frame;
@@ -37,6 +41,9 @@ struct Decoder
     AVFormatContext* format_context;
     AVCodecContext*  codec_context;
     AVCodec*         codec;
+    
+    AVCodecContext*  audio_codec_context;
+    AVCodec*         audio_codec;
  
     // time_base:    
     // N / D = seconds per frame
@@ -47,10 +54,14 @@ struct Decoder
     int64_t number_of_frames; // in the whole stream, or 0 if unknown
     
     int video_stream_index;
-    int audio_stream_index; // FIXME: unused
+    int audio_stream_index;
     
     bool seek_flag; // set by seek to tell decoder thread to flush old data
     int64_t seek_to;
+    
+    #ifndef NO_AUDIO
+    Audio* audio; // owned by Player, but copied here for setup by decoder
+    #endif
     
     Decoder()
     {
@@ -63,6 +74,9 @@ struct Decoder
         format_context = NULL;
         codec_context  = NULL;
         codec          = NULL;
+        
+        audio_codec_context = NULL;
+        audio_codec         = NULL;
         
         video_stream_index = -1;
         audio_stream_index = -1;

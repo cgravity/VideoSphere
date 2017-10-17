@@ -146,6 +146,13 @@ void Player::start_threads()
     {
         decoder.looping = true;
     }
+    
+    #ifndef NO_AUDIO
+    if(audio.setup_state == AuSS_READY_TO_PLAY)
+    {
+        audio.start();
+    }
+    #endif
 }
 
 
@@ -305,6 +312,13 @@ void parse_args(Player& player, int argc, char* argv[])
             player.looping = true;
             continue;
         }
+        
+        #ifndef NO_AUDIO
+        if(argv[i] == string("--audio"))
+        {
+            player.audio.setup_state = AuSS_START_DECODING;
+        }
+        #endif
     }
     
     // sanity checks
