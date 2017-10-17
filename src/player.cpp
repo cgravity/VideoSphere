@@ -141,6 +141,11 @@ void Player::start_threads()
         cerr << "You must specify --client, --server, or --headless!\n";
         exit(EXIT_FAILURE);
     }
+    
+    if(looping)
+    {
+        decoder.looping = true;
+    }
 }
 
 
@@ -292,6 +297,12 @@ void parse_args(Player& player, int argc, char* argv[])
         if(argv[i] == string("--stereo"))
         {
             player.stereo = true;
+            continue;
+        }
+        
+        if(argv[i] == string("--loop") || argv[i] == string("looping"))
+        {
+            player.looping = true;
             continue;
         }
     }

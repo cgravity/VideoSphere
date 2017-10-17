@@ -252,6 +252,12 @@ continue_point:         // loop start
             }
         } // while av_read_frame
         
+        if(looping)
+        {
+            seek(0);
+            goto continue_point;
+        }
+        
         lock();
         decoded_all_flag = true; // reached end of data
         unlock();

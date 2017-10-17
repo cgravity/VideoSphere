@@ -30,6 +30,7 @@ struct Decoder
 
     bool exit_flag;
     bool decoded_all_flag;
+    bool looping;
     std::list<DecoderFrame> showable_frames;
     std::list<AVFrame*> fillable_frames;
     
@@ -67,6 +68,7 @@ struct Decoder
         audio_stream_index = -1;
         
         seek_flag = false;
+        looping = false;
     }
     
     // opens a video file, returning true if successful
@@ -79,6 +81,8 @@ struct Decoder
         
         seek_flag = true;
         this->seek_to = seek_to;
+        
+        decoded_all_flag = false;
         
         pthread_mutex_unlock(&mutex);
     }

@@ -75,6 +75,7 @@ struct Player
     
     bool stereo;
     bool paused;
+    bool looping; // indicates whether should loop at end of video
     
     Player()
     {
@@ -91,6 +92,7 @@ struct Player
         paused = false;
         
         use_multicast = false;
+        looping = false;
     }
     
     // starts up the networking and decoder based on type.
