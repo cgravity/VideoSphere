@@ -336,7 +336,10 @@ int main(int argc, char* argv[])
             if(!space_down)
             {
                 player.paused = !player.paused;
+                #ifndef NO_AUDIO
                 player.audio.paused = player.paused;
+                #endif
+                
                 if(server)
                 {
                     Message x;
