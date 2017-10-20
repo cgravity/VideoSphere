@@ -14,8 +14,8 @@ struct ScreenConfig
     // monitor index to use, -1 for default monitor (e.g. for server)
     int index;
     
-    float width;
-    float height;
+    float width;        // millimeters
+    float height;       // millimeters
     
     float heading;
     float pitch;

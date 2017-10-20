@@ -280,6 +280,21 @@ int main(int argc, char* argv[])
                     player.seek(target);
                 }
                 
+                if(js_curr.button_start && !js_prev.button_start)
+                {
+                    player.paused = !player.paused;
+                    #ifndef NO_AUDIO
+                    player.audio.paused = player.paused;
+                    #endif
+                    
+                    if(server)
+                    {
+                        Message x;
+                        x.write_char('X');
+                        server->send(x);
+                    }
+                }
+                
                 // this debug tool helps to discover button numbers
 //                if(js_prev.valid && js_curr.valid)
 //                    for(size_t i = 0; i < js_curr.buttons.size(); i++)
