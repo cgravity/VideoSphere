@@ -119,8 +119,8 @@ int main(int argc, char* argv[])
     // This is very important for the SunCAVE
     if(player.type == NT_CLIENT)
     {
-        Display* dpy = XOpenDisplay(0);
-        Window root = XRootWindow(dpy, 0);
+        Display* dpy = XOpenDisplay(":0");
+        Window root = XRootWindow(dpy, 1);
         XWarpPointer(dpy, None, root, 0,0,0,0,  0,0);
         XCloseDisplay(dpy);
     }

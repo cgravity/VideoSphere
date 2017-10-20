@@ -391,16 +391,16 @@ void Player::create_windows()
     GLFWwindow* share_context = NULL;
     
 //    // workaround for starting over SSH on WAVE
-//    if(this->monitor >= 0)
-//    {
-//        if(this->monitor > screen_config.size())
-//            fatal("Requested monitor out of range");
-//        
-//        ScreenConfig sc = screen_config[this->monitor];
-//        sc.index = 0;
-//        screen_config.clear();
-//        screen_config.push_back(sc);
-//    }
+    if(this->monitor >= 0)
+    {
+        if(this->monitor > screen_config.size())
+            fatal("Requested monitor out of range");
+        
+        ScreenConfig sc = screen_config[this->monitor];
+        sc.index = 0;
+        screen_config.clear();
+        screen_config.push_back(sc);
+    }
     
     for(size_t i = 0; i < screen_config.size(); i++)
     {
