@@ -10,6 +10,45 @@ static void* decoder_thread_main(void* arg)
     return NULL;
 }
 
+#ifndef NO_AUDIO
+/*
+void load_audio_mono_s16(Audio* audio, AVFrame* frame)
+{
+    // FIXME
+    for(int i = 0; i < frame->nb_samples; i++)
+    {
+        int16_t sample = frame->data[0][i];
+        
+        audio->samples.push_back(sample);
+        audio->samples.push_back(sample);
+    }
+}
+
+void load_audio_stereo_s16_packed(Audio* audio, AVFrame* frame)
+{
+    // FIXME
+    for(int i = 0; i < 2*frame->nb_samples; i++)
+    {
+        int16_t sample = frame->data[0][i];
+        audio->samples.push_back(sample);
+    }
+}
+*/
+
+void load_audio_stereo_fltp(Audio* audio, AVFrame* frame)
+{    
+    float* a = (float*)frame->data[0];
+    float* b = (float*)frame->data[1];
+    
+    static float theta = 0;
+    for(int i = 0; i < frame->nb_samples; i++)
+    {
+        audio->samples.push_back(*a); a++;
+        audio->samples.push_back(*b); b++;
+    }
+}
+
+#endif // NO_AUDIO
 
 bool Decoder::open(const std::string& path)
 {
@@ -32,14 +71,20 @@ bool Decoder::open(const std::string& path)
     
     
     video_stream_index = -1;
-    // FIXME: Audio stream
+    audio_stream_index = -1;
     
     for(int i = 0;i < format_context->nb_streams; i++)
     {
-        if(format_context->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO)
+        if(format_context->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO
+            && video_stream_index == -1)
         {
             video_stream_index = i;
-            break;
+        }
+        
+        if(format_context->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO
+            && audio_stream_index == -1)
+        {
+            audio_stream_index = i;
         }
     }
     
@@ -49,6 +94,14 @@ bool Decoder::open(const std::string& path)
         return false;
     }
     
+    #ifndef NO_AUDIO
+    if(audio_stream_index == -1 && audio->setup_state != AuSS_NO_AUDIO)
+    {
+        cerr << "Warning: Failed to find audio stream\n";
+        audio->setup_state = AuSS_NO_AUDIO;
+    }
+    #endif
+    
     codec = avcodec_find_decoder(
         format_context->streams[video_stream_index]->codecpar->codec_id);
     
@@ -57,6 +110,7 @@ bool Decoder::open(const std::string& path)
         cerr << "Unsupported codec\n";
         return false;
     }
+    
     
     //cout << "CODEC IS: " << codec->name << '\n';
     
@@ -73,6 +127,7 @@ bool Decoder::open(const std::string& path)
     
     codec_context->thread_count = 8;
     
+    // FIXME: Should this be 'refcounted_frames'???
     AVDictionary* opts = NULL;
     av_dict_set(&opts, "recounted_frames", "1", 0);
     
@@ -85,6 +140,146 @@ bool Decoder::open(const std::string& path)
     time_base = format_context->streams[video_stream_index]->time_base;
     duration = format_context->streams[video_stream_index]->duration;
     number_of_frames = format_context->streams[video_stream_index]->nb_frames;
+    
+    
+    #ifndef NO_AUDIO
+    if(audio_stream_index != -1 && audio->setup_state != AuSS_NO_AUDIO)
+    {
+        audio_codec = avcodec_find_decoder(
+            format_context->streams[audio_stream_index]->codecpar->codec_id);
+        
+        if(audio_codec == NULL)
+        {
+            cerr << "Unsupported audio codec!\n";
+            audio->setup_state = AuSS_NO_AUDIO;
+            goto end_audio_setup;
+        }
+        
+        audio_codec_context = avcodec_alloc_context3(audio_codec);
+        
+        if(!audio_codec_context)
+        {
+            cerr << "Failed to allocate audio codec context!\n";
+            audio->setup_state = AuSS_NO_AUDIO;
+            goto end_audio_setup;
+        }
+    
+        avcodec_parameters_to_context(audio_codec_context,
+            format_context->streams[audio_stream_index]->codecpar);
+            
+        // FIXME: Should this be 'refcounted_frames'???
+        AVDictionary* audio_opts = NULL;        
+        av_dict_set(&audio_opts, "recounted_frames", "1", 0);
+        
+        if(avcodec_open2(audio_codec_context, audio_codec, &audio_opts) < 0)
+        {
+            cerr << "Couldn't open audio codec\n";
+            audio->setup_state = AuSS_NO_AUDIO;
+            goto end_audio_setup;
+        }
+        
+        // decode all audio and stick it in the audio buffer
+        // usually this will be a couple hundred megs of data -- no problem
+        // on our systems in 2017 -- and greatly simplifies other logic
+        
+        if(audio->setup_state == AuSS_START_DECODING)
+        {
+            cerr << "Decoding audio...\n";
+            
+            audio->setup_state = AuSS_DECODING;
+    
+            int frame_finished = 0;
+            AVPacket packet;
+            AVFrame* frame = av_frame_alloc();
+            
+            packet.data = NULL;
+            packet.size = 0;
+            
+            bool got_audio_details = false;
+            void (*audio_loader)(Audio*,AVFrame*);
+            
+            int status = 0;
+            
+            // helpful format details in post by user "cornstalks" here:
+            // https://www.gamedev.net/forums/topic/624876-how-to-read-an-audio-file-with-ffmpeg-in-c/?PageSpeed=noscript
+            while(av_read_frame(format_context, &packet) >= 0)
+            {
+                if(packet.stream_index == audio_stream_index)
+                {
+                    status = avcodec_decode_audio4(audio_codec_context, frame, 
+                        &frame_finished, &packet);
+                    
+                    if(frame_finished != 0)
+                    {
+                        // first time through, check info on sample rate,
+                        // number of channels, etc
+                        if(!got_audio_details)
+                        {
+                            got_audio_details = true;
+                            audio->sample_rate = frame->sample_rate;
+                            
+                            /*if(frame->channels == 1 && 
+                                audio_codec_context->sample_fmt ==
+                                    AV_SAMPLE_FMT_S16)
+                            {
+                                audio_loader = load_audio_mono_s16;
+                            }
+                            else if(frame->channels == 2 &&
+                                audio_codec_context->sample_fmt == 
+                                    AV_SAMPLE_FMT_S16 &&
+                                !av_sample_fmt_is_planar(
+                                    audio_codec_context->sample_fmt))
+                            {
+                                audio_loader = load_audio_stereo_s16_packed;
+                            }
+                            else*/ if(frame->channels = 2 &&
+                                audio_codec_context->sample_fmt ==
+                                    AV_SAMPLE_FMT_FLTP)
+                            {
+                                audio_loader = load_audio_stereo_fltp;
+                            }
+                            else
+                            {
+                                cerr << "ERROR: Unsupported audio format!\n";
+                                cerr << "Channels: " << frame->channels << '\n';
+                                cerr << "FMT: " << av_get_sample_fmt_name(audio_codec_context->sample_fmt) << '\n';
+                                cerr << "Planar: " << av_sample_fmt_is_planar(audio_codec_context->sample_fmt) << '\n';
+                                break;
+                            }
+                        }
+                        
+                        // copy audio data into buffer based on format details
+                        audio_loader(audio, frame);
+                        av_frame_unref(frame);
+                    }
+
+                    char buf[256];
+
+                    if(status < 0)
+                    {
+                        av_strerror(status, buf, sizeof(buf));
+                        cerr << "ERROR " << buf << '\n';
+                    }
+
+
+                    av_free_packet(&packet);
+                } // if packet.stream_index == audio_stream_index
+                else
+                {
+                    av_free_packet(&packet);
+                }
+            } // while av_read_frame
+            
+            cerr << "Finished decoding audio\n";
+            
+            // indicate that we successfully loaded audio so that the
+            // audio callback can be initialized
+            audio->setup_state = AuSS_READY_TO_PLAY;
+            seek(0);
+        }
+    }
+  end_audio_setup:
+    #endif
     
     return true;
 } // Decoder::open
@@ -251,6 +446,15 @@ continue_point:         // loop start
                 av_free_packet(&packet);
             }
         } // while av_read_frame
+        
+        if(looping)
+        {
+            seek(0);
+            #ifndef NO_AUDIO
+            audio->seek(0);
+            #endif
+            goto continue_point;
+        }
         
         lock();
         decoded_all_flag = true; // reached end of data

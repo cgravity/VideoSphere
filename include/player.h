@@ -6,6 +6,10 @@
 #include "multicast.h"
 #include "window.h"
 
+#ifndef NO_AUDIO
+#include "audio.h"
+#endif
+
 #include <vector>
 #include <string>
 
@@ -33,6 +37,10 @@ struct Player
     
     // video decoder thread
     Decoder decoder;
+    
+    #ifndef NO_AUDIO
+    Audio audio;
+    #endif
     
     // indicates the current timestamp and start timestamp of the video
     // in units understood by FFMPEG. (usually microseconds)
@@ -75,6 +83,7 @@ struct Player
     
     bool stereo;
     bool paused;
+    bool looping; // indicates whether should loop at end of video
     
     Player()
     {
@@ -91,6 +100,11 @@ struct Player
         paused = false;
         
         use_multicast = false;
+        looping = false;
+        
+        #ifndef NO_AUDIO
+        decoder.audio = &audio;
+        #endif
     }
     
     // starts up the networking and decoder based on type.

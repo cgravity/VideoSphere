@@ -141,6 +141,18 @@ void Player::start_threads()
         cerr << "You must specify --client, --server, or --headless!\n";
         exit(EXIT_FAILURE);
     }
+    
+    if(looping)
+    {
+        decoder.looping = true;
+    }
+    
+    #ifndef NO_AUDIO
+    if(audio.setup_state == AuSS_READY_TO_PLAY)
+    {
+        audio.start();
+    }
+    #endif
 }
 
 
@@ -294,6 +306,19 @@ void parse_args(Player& player, int argc, char* argv[])
             player.stereo = true;
             continue;
         }
+        
+        if(argv[i] == string("--loop") || argv[i] == string("looping"))
+        {
+            player.looping = true;
+            continue;
+        }
+        
+        #ifndef NO_AUDIO
+        if(argv[i] == string("--audio"))
+        {
+            player.audio.setup_state = AuSS_START_DECODING;
+        }
+        #endif
     }
     
     // sanity checks
@@ -589,5 +614,8 @@ void Player::seek(int64_t target)
     seek_to /= AV_TIME_BASE;
     decoder.seek(seek_to);
     
+    #ifndef NO_AUDIO
+    audio.seek(target);
+    #endif
 }
 
