@@ -477,6 +477,8 @@ int main(int argc, char* argv[])
         decoded_all = decoder.decoded_all_flag;
         decoder.unlock();
         
+        int64_t now_prev = now;
+        
         if(!player.paused)
         {
             #ifndef NO_AUDIO
@@ -497,6 +499,13 @@ int main(int argc, char* argv[])
             #else
             now = av_gettime_relative() - start;
             #endif
+        }
+        
+        // if we've jumped backwards more than a second, seek video
+        // audio sync loop fix
+        if(now < now_prev && abs(now - now_prev ) > 1000000)
+        {
+            player.seek(now);
         }
         
         double now_f = now / 1000000.0;
