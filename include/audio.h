@@ -23,7 +23,7 @@ enum AudioSetupState
     // thread to communicate to the main thread that playing can start
     AuSS_READY_TO_PLAY,
     
-    // set by the main thread after calling open_stream() and start_stream()
+    // set once Audio::start() has been called
     AuSS_PLAYING
 };
 

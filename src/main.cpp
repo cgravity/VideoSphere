@@ -282,9 +282,12 @@ int main(int argc, char* argv[])
                 
                 if(js_curr.button_start && !js_prev.button_start)
                 {
+                    cout << "pause pressed\n";
                     player.paused = !player.paused;
                     #ifndef NO_AUDIO
-                    player.audio.paused = player.paused;
+                    player.audio.lock();
+                        player.audio.paused = player.paused;
+                    player.audio.unlock();
                     #endif
                     
                     if(server)
@@ -352,7 +355,9 @@ int main(int argc, char* argv[])
             {
                 player.paused = !player.paused;
                 #ifndef NO_AUDIO
-                player.audio.paused = player.paused;
+                player.audio.lock();
+                    player.audio.paused = player.paused;
+                player.audio.unlock();
                 #endif
                 
                 if(server)
@@ -481,15 +486,22 @@ int main(int argc, char* argv[])
                 player.audio.lock();
                 now = player.audio.now;
                 player.audio.unlock();
+                
+                cout << "Audio advance\n";
             }
             else
             {
+                cout << "av advance\n";
                 now = av_gettime_relative() - start;
             }
             #else
+            cout << "ifndef advance\n";
             now = av_gettime_relative() - start;
             #endif
         }
+        
+        cout << "audio state = " << player.audio.setup_state << '\n';
+        cout << "now = " << now << '\n';
         
         double now_f = now / 1000000.0;
 

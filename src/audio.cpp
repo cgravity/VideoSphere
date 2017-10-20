@@ -74,6 +74,8 @@ void Audio::start()
     fwrite(&samples[0], sizeof(samples[0]), samples.size(), fp);
     fclose(fp);
     */
+    
+    setup_state = AuSS_PLAYING;
 }
 
 
