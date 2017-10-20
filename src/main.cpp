@@ -487,21 +487,17 @@ int main(int argc, char* argv[])
                 now = player.audio.now;
                 player.audio.unlock();
                 
-                cout << "Audio advance\n";
+                // convert from audio timestamp (sample count) to microseconds
+                now = 1000000.0/(2*player.audio.sample_rate) * now;
             }
             else
             {
-                cout << "av advance\n";
                 now = av_gettime_relative() - start;
             }
             #else
-            cout << "ifndef advance\n";
             now = av_gettime_relative() - start;
             #endif
         }
-        
-        cout << "audio state = " << player.audio.setup_state << '\n';
-        cout << "now = " << now << '\n';
         
         double now_f = now / 1000000.0;
 
