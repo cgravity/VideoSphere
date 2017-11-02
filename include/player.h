@@ -25,6 +25,14 @@ enum NetworkType
     NT_HEADLESS
 };
 
+enum StereoType
+{
+    STEREO_NONE,
+    STEREO_TOP_BOTTOM,
+    STEREO_HALF_TOP,
+    STEREO_HALF_BOTTOM
+};
+
 struct Player
 {
     NetworkType type;
@@ -85,6 +93,8 @@ struct Player
     bool paused;
     bool looping; // indicates whether should loop at end of video
     
+    StereoType stereo_type;
+    
     Player()
     {
         type = NT_UNDEFINED;
@@ -98,6 +108,8 @@ struct Player
         seek_flag = false;
         stereo = false;
         paused = false;
+        
+        stereo_type = STEREO_NONE;
         
         use_multicast = false;
         looping = false;

@@ -304,6 +304,29 @@ void parse_args(Player& player, int argc, char* argv[])
         if(argv[i] == string("--stereo"))
         {
             player.stereo = true;
+            player.stereo_type = STEREO_TOP_BOTTOM;
+            continue;
+        }
+        
+        if(argv[i] == string("--stereo-half"))
+        {
+            i++;
+            if(i >= argc)
+                fatal("expected 'top' or 'bottom' after --stereo-half");
+            
+            if(argv[i] == string("top"))
+            {
+                player.stereo_type = STEREO_HALF_TOP;
+            }
+            else if(argv[i] == string("bottom"))
+            {
+                player.stereo_type = STEREO_HALF_BOTTOM;
+            }
+            else
+            {
+                fatal("--stereo-half followed by something other than 'top' or 'bottom'");
+            }
+            
             continue;
         }
         

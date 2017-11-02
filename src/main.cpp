@@ -167,6 +167,11 @@ int main(int argc, char* argv[])
             shader_program = &Window_::aa_mono_equirect_program;
     }
     
+    if(player.stereo_type == STEREO_HALF_TOP || 
+        player.stereo_type == STEREO_HALF_BOTTOM)
+    {
+        shader_program = &Window_::stereo_equirect_program;
+    }
     
     
     float theta = 0.0;
@@ -829,6 +834,21 @@ int main(int argc, char* argv[])
             
             if(server || !player.stereo)
             {
+                if(player.stereo_type == STEREO_HALF_TOP)
+                {
+                    GLint stereo_  = 
+                        glGetUniformLocation(sp, "stereo_half");
+                    
+                    glUniform1f(stereo_, 1.0);
+                }
+                else if(player.stereo_type == STEREO_HALF_BOTTOM)
+                {
+                    GLint stereo_  = 
+                        glGetUniformLocation(sp, "stereo_half");
+                        
+                    glUniform1f(stereo_, 0.0);                
+                }
+            
                 glBegin(GL_QUADS);
                     // top left
                     glVertexAttrib3f(pos, -11, 2*1.5, 6);
