@@ -851,22 +851,26 @@ int main(int argc, char* argv[])
             
                 glBegin(GL_QUADS);
                     // top left
-                    glVertexAttrib3f(pos, -11, 2*1.5, 6);
+                    //glVertexAttrib3f(pos, -11, 2*1.5, 6);
+                    glVertexAttrib3f(pos, -1, 1, 0);
                     glTexCoord2f(0, 0); // only used by server
                     glVertex2f(-1, 1);
                     
                     // bottom left
-                    glVertexAttrib3f(pos, -11, 2*1.5, -6);
+                    //glVertexAttrib3f(pos, -11, 2*1.5, -6);
+                    glVertexAttrib3f(pos, -1, -1, 0);
                     glTexCoord2f(0, 1);
                     glVertex2f(-1, -1);
 
                     // bottom right
-                    glVertexAttrib3f(pos, 11, 2*1.5, -6);
+                    //glVertexAttrib3f(pos, 11, 2*1.5, -6);
+                    glVertexAttrib3f(pos, 1, -1, 0);
                     glTexCoord2f(1,1);
                     glVertex2f(1,-1);
                     
                     // top right
-                    glVertexAttrib3f(pos, 11, 2*1.5, 6);
+                    //glVertexAttrib3f(pos, 11, 2*1.5, 6);
+                    glVertexAttrib3f(pos, 1, 1, 0);
                     glTexCoord2f(1, 0);
                     glVertex2f(1,1);            
                 glEnd();
