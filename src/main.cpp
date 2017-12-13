@@ -316,8 +316,17 @@ int main(int argc, char* argv[])
              
             if(js_curr.valid)
             {
-                theta += dt * js_curr.right_stick_x * TURN/3.0;
-                phi   -= dt * js_curr.right_stick_y * (TURN/4.0) / 2.0;
+                float js_x = js_curr.right_stick_x;
+                float js_y = js_curr.right_stick_y;
+                
+                // deadzone
+                if(fabs(js_x) < 0.15)
+                    js_x = 0.0;
+                if(fabs(js_y) < 0.15)
+                    js_y = 0.0;
+            
+                theta += dt * js_x * TURN/3.0;
+                phi   -= dt * js_y * (TURN/4.0) / 2.0;
             }
         }
       
@@ -712,7 +721,8 @@ int main(int argc, char* argv[])
         if(!show_frame.frame && !show_frame_prev.frame)
         {
             // no new frames ready
-            continue;
+            //continue;
+            goto REDRAW;
         }
         
         if(!show_frame.frame && show_frame_prev.frame)
@@ -798,7 +808,7 @@ int main(int argc, char* argv[])
         
         decoder.return_frame(show_frame);
         
-        
+REDRAW:        
         for(size_t i = 0; i < player.windows.size(); i++)
         {
             //glfwMakeContextCurrent(player.windows[i]);
