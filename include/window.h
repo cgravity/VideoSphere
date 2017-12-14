@@ -30,6 +30,7 @@ struct Window_
     GLint mono_equirect_program;
     GLint aa_mono_equirect_program;
     GLint stereo_equirect_program;
+    GLint stereo_interleaved_program;
     
     Window_()
     {

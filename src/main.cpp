@@ -142,6 +142,10 @@ int main(int argc, char* argv[])
     stereo_equirect_files.push_back("shaders/simple-stereo.vert");
     stereo_equirect_files.push_back("shaders/simple-stereo.frag");
     
+    vector<string> stereo_interleaved_files;
+    stereo_interleaved_files.push_back("shaders/simple-stereo.vert");
+    stereo_interleaved_files.push_back("shaders/interleaved-stereo.frag");
+    
     // need to compile shaders for each window
     for(size_t i = 0; i < player.windows.size(); i++)
     {    
@@ -151,6 +155,7 @@ int main(int argc, char* argv[])
         player.windows[i]->mono_equirect_program = load_shaders(mono_equirect_files);
         player.windows[i]->aa_mono_equirect_program = load_shaders(aa_mono_equirect_files);
         player.windows[i]->stereo_equirect_program = load_shaders(stereo_equirect_files);
+        player.windows[i]->stereo_interleaved_program = load_shaders(stereo_interleaved_files);
     }
     
     // select which shader to use
@@ -162,7 +167,12 @@ int main(int argc, char* argv[])
     else
     {
         if(player.stereo)
-            shader_program = &Window_::stereo_equirect_program;
+        {
+            if(player.stereo_type == STEREO_TOP_BOTTOM_INTERLEAVED)
+                shader_program = &Window_::stereo_interleaved_program;
+            else
+                shader_program = &Window_::stereo_equirect_program;
+        }
         else
             shader_program = &Window_::aa_mono_equirect_program;
     }
@@ -842,7 +852,37 @@ REDRAW:
             glUniform1f(width_, player.screen_config[i].width);
             glUniform1f(height_, player.screen_config[i].height);
             
-            if(server || !player.stereo)
+            if(player.stereo_type == STEREO_TOP_BOTTOM_INTERLEAVED)
+            {
+                // top/bottom stereo
+                GLint stereo_  = 
+                    glGetUniformLocation(sp, "stereo_half");
+                    
+                glUniform1f(stereo_, 1.0);
+                glBegin(GL_QUADS);
+                    glVertexAttrib3f(pos, -1, 1, 0);
+                    glVertex2f(-1, 1);
+                    glVertexAttrib3f(pos, -1, -1, 0);
+                    glVertex2f(-1, -1);
+                    glVertexAttrib3f(pos, 1, -1, 0);
+                    glVertex2f(1,-1);
+                    glVertexAttrib3f(pos, 1, 1, 0);
+                    glVertex2f(1,1);
+                glEnd();
+                    
+                glUniform1f(stereo_, 0.0);
+                glBegin(GL_QUADS);
+                    glVertexAttrib3f(pos, -1, 1, 0);
+                    glVertex2f(-1, 1);
+                    glVertexAttrib3f(pos, -1, -1, 0);
+                    glVertex2f(-1, -1);
+                    glVertexAttrib3f(pos, 1, -1, 0);
+                    glVertex2f(1,-1);
+                    glVertexAttrib3f(pos, 1, 1, 0);
+                    glVertex2f(1,1);
+                glEnd();
+            }
+            else if(server || !player.stereo)
             {
                 if(player.stereo_type == STEREO_HALF_TOP)
                 {
