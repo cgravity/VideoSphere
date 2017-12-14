@@ -487,7 +487,7 @@ int main(int argc, char* argv[])
             phi = -TURN/4;
 
         
-        if(send_pos && player.type == NT_SERVER)
+        if(send_pos && player.server)
         {
             Message turn;
             turn.write_byte('T');
