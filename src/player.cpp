@@ -330,7 +330,8 @@ void parse_args(Player& player, int argc, char* argv[])
             continue;
         }
         
-        if(argv[i] == string("--stereo-interleaved"))
+        if(argv[i] == string("--stereo-interleaved") || 
+           argv[i] == string("--stereo-interlaced"))
         {
             player.stereo = true;
             player.stereo_type = STEREO_TOP_BOTTOM_INTERLEAVED;
