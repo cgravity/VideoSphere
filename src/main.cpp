@@ -57,6 +57,7 @@ int main(int argc, char* argv[])
     
     av_register_all();
     avcodec_register_all();
+    avformat_network_init();
     
     int64_t& start = player.start;
     int64_t& now = player.now;
