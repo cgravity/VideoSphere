@@ -498,6 +498,15 @@ int main(int argc, char* argv[])
             server->send(turn);
         }
         
+        player.audio.lock();
+        player.audio.direction = fmod(theta, TURN);
+        player.audio.unlock();
+        
+        QuadBinaural qb(player.audio.direction);
+        //printf("dir = %0.3f, A = %d, B = %d, fa = %0.3f, fb = %0.3f\n",
+        //    player.audio.direction / TURN,
+        //    qb.A, qb.B, qb.fraction_a, qb.fraction_b);
+        
         decoder.lock();
         decoded_all = decoder.decoded_all_flag;
         decoder.unlock();

@@ -37,6 +37,8 @@ void load_audio_stereo_s16_packed(Audio* audio, AVFrame* frame)
 
 void load_audio_stereo_fltp(Audio* audio, AVFrame* frame)
 {    
+    audio->mode = AM_SIMPLE;
+    
     float* a = (float*)frame->data[0];
     float* b = (float*)frame->data[1];
     
@@ -45,6 +47,32 @@ void load_audio_stereo_fltp(Audio* audio, AVFrame* frame)
     {
         audio->samples.push_back(*a); a++;
         audio->samples.push_back(*b); b++;
+    }
+}
+
+void load_audio_qb_fltp(Audio* audio, AVFrame* frame)
+{
+    audio->mode = AM_QUAD_BINAURAL;
+    
+    for(int i = 0; i < frame->nb_samples; i++)
+    for(int j = 0; j < 8; j++)
+    {
+        float* ptr = (float*)frame->data[j] + i;
+        audio->samples.push_back(*ptr);
+    }
+}
+
+void load_audio_qb_s16_packed(Audio* audio, AVFrame* frame)
+{
+    audio->mode = AM_QUAD_BINAURAL;
+    
+    int16_t* src = (int16_t*)frame->data[0];
+    
+    for(int i = 0; i < 8*frame->nb_samples; i++)
+    {
+        float sf = *src++;
+        sf /= 0x7FFF;
+        audio->samples.push_back(sf);
     }
 }
 
@@ -232,11 +260,25 @@ bool Decoder::open(const std::string& path)
                             {
                                 audio_loader = load_audio_stereo_s16_packed;
                             }
-                            else*/ if(frame->channels = 2 &&
+                            else*/ if(frame->channels == 2 &&
                                 audio_codec_context->sample_fmt ==
                                     AV_SAMPLE_FMT_FLTP)
                             {
                                 audio_loader = load_audio_stereo_fltp;
+                            }
+                            else if(frame->channels == 8 &&
+                                audio_codec_context->sample_fmt ==
+                                    AV_SAMPLE_FMT_FLTP)
+                            {
+                                audio_loader = load_audio_qb_fltp;
+                            }
+                            else if(frame->channels == 8 &&
+                                audio_codec_context->sample_fmt ==
+                                    AV_SAMPLE_FMT_S16 && 
+                                !av_sample_fmt_is_planar(
+                                    audio_codec_context->sample_fmt))
+                            {
+                                audio_loader = load_audio_qb_s16_packed;
                             }
                             else
                             {
