@@ -27,9 +27,12 @@ vec2 vec3_to_latlong(vec3 vec)
 void main()
 {
     vec2 latlong = vec3_to_latlong(normalize(pos));
+    
+    // eye separation angle to add, based on empirical testing w/ Dan on CAVE2
+    float empirical_eye_sep = stereo_half * 0.9 * 2.0 / 30.0 * TURN/16.0;
 
     float lat = latlong.x;
-    float lon = mod(latlong.y, TURN);
+    float lon = mod(latlong.y - empirical_eye_sep, TURN);
     
     float x = lon / TURN;
     float y = ((lat / (0.25*TURN) + 1.0)) / 2.0;
