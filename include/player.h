@@ -94,6 +94,9 @@ struct Player
     bool paused;
     bool looping; // indicates whether should loop at end of video
     
+    // enables suncave X cursor workaround (default: disabled)
+    bool suncave_workarounds; 
+    
     StereoType stereo_type;
     
     Player()
@@ -118,6 +121,8 @@ struct Player
         #ifndef NO_AUDIO
         decoder.audio = &audio;
         #endif
+        
+        suncave_workarounds = false;
     }
     
     // starts up the networking and decoder based on type.

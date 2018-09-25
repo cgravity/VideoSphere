@@ -350,6 +350,11 @@ void parse_args(Player& player, int argc, char* argv[])
             player.audio.setup_state = AuSS_START_DECODING;
         }
         #endif
+        
+        if(argv[i] == string("--suncave"))
+        {
+            player.suncave_workarounds = true;
+        }
     }
     
     // sanity checks

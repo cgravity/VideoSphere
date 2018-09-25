@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
     
     // Fixes weird X Cursor bug when you have two GPUs on CentOS 7
     // This is very important for the SunCAVE
-    if(player.type == NT_CLIENT)
+    if(player.suncave_workarounds)
     {
         Display* dpy = XOpenDisplay(":0");
         Window root = XRootWindow(dpy, 1);
